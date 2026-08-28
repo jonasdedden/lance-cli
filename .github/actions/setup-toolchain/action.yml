@@ -33,12 +33,12 @@ runs:
         target: ${{ inputs.rust-target }}
         cache: false
 
-    # `arduino/setup-protoc` extracts the official protoc release zip — which
+    # `rustfs/setup-protoc` extracts the official protoc release zip — which
     # includes the well-known `.proto` files under `<toolpath>/include/` — but
     # only adds `<toolpath>/bin` to PATH. `prost-build` reads `PROTOC_INCLUDE`
     # to locate `google/protobuf/empty.proto`, so we wire it up explicitly.
     - name: Install protoc
-      uses: arduino/setup-protoc@v3
+      uses: rustfs/setup-protoc@v3.0.1
       with:
         repo-token: ${{ github.token }}
     - name: Export PROTOC_INCLUDE
