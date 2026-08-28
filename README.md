@@ -13,6 +13,11 @@ lance-cli search --column embedding --vector-file q.json -k 10 dataset.lance
 
 ## Install
 
+> **Not released yet.** Neither package below is published — the commands are
+> what installation will look like. The project is intended for donation to the
+> [Lance](https://github.com/lancedb) namespace, and the first release will be
+> cut from there. For now, build from a clone.
+
 ```sh
 uv tool install lance-cli   # prebuilt binary, from PyPI
 cargo install lance-cli     # from crates.io
