@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::cli::{LanceArgs, SchemaType};
+use crate::cli::{SchemaType, VersionArgs};
 use crate::commands::common::project_arrow_schema;
 use crate::dataset;
 use crate::projection;
@@ -9,9 +9,9 @@ pub async fn run(
     ty: SchemaType,
     columns: Option<&[String]>,
     exclude: Option<&[String]>,
-    lance: &LanceArgs,
+    version: &VersionArgs,
 ) -> Result<()> {
-    let ds = dataset::open(input, Some(lance)).await?;
+    let ds = dataset::open(input, Some(version)).await?;
     let arrow_schema = ds.arrow_schema();
     let projection = projection::resolve(&arrow_schema, columns, exclude)?;
 

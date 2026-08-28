@@ -105,7 +105,9 @@ pub async fn write_simple(tmp: &TempDir, name: &str) -> PathBuf {
     let batch = simple_batch();
     let schema = batch.schema();
     let iter = RecordBatchIterator::new(vec![Ok(batch)].into_iter(), schema);
-    arrs::lance::write_dataset(&path, iter).await.unwrap();
+    lance_cli::dataset::write_dataset(&path, iter)
+        .await
+        .unwrap();
     path
 }
 
@@ -145,7 +147,9 @@ pub async fn write_full(tmp: &TempDir, name: &str) -> PathBuf {
     let batch = full_batch();
     let schema = batch.schema();
     let iter = RecordBatchIterator::new(vec![Ok(batch)].into_iter(), schema);
-    arrs::lance::write_dataset(&path, iter).await.unwrap();
+    lance_cli::dataset::write_dataset(&path, iter)
+        .await
+        .unwrap();
     path
 }
 
@@ -170,7 +174,9 @@ pub async fn write_with_binary(tmp: &TempDir, name: &str) -> PathBuf {
     let batch = with_binary_batch();
     let schema = batch.schema();
     let iter = RecordBatchIterator::new(vec![Ok(batch)].into_iter(), schema);
-    arrs::lance::write_dataset(&path, iter).await.unwrap();
+    lance_cli::dataset::write_dataset(&path, iter)
+        .await
+        .unwrap();
     path
 }
 
@@ -247,7 +253,9 @@ pub async fn write_struct(tmp: &TempDir, name: &str) -> PathBuf {
     let batch = struct_batch();
     let schema = batch.schema();
     let iter = RecordBatchIterator::new(vec![Ok(batch)].into_iter(), schema);
-    arrs::lance::write_dataset(&path, iter).await.unwrap();
+    lance_cli::dataset::write_dataset(&path, iter)
+        .await
+        .unwrap();
     path
 }
 

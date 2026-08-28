@@ -1,7 +1,7 @@
 //! End-to-end tests for the CLI-polish features (issue #14): shell completions,
 //! the scan progress indicator's stdout hygiene, and `cat` glob expansion.
 //!
-//! These drive the real compiled binary (`CARGO_BIN_EXE_arrs`) so that the
+//! These drive the real compiled binary (`CARGO_BIN_EXE_lance-cli`) so that the
 //! progress indicator's TTY gating is exercised for real: the test captures
 //! stdout and stderr through pipes, so stderr is *not* a TTY and the indicator
 //! must therefore be absent entirely — which is exactly what we assert.
@@ -25,13 +25,13 @@ fn runtime() -> Runtime {
         .unwrap()
 }
 
-/// Run the `arrs` binary with `args` and capture its output (stdout + stderr are
+/// Run the `lance-cli` binary with `args` and capture its output (stdout + stderr are
 /// both pipes, so stderr is never a TTY).
 fn run(args: &[&str]) -> Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_arrs"))
+    std::process::Command::new(env!("CARGO_BIN_EXE_lance-cli"))
         .args(args)
         .output()
-        .expect("spawn arrs binary")
+        .expect("spawn lance-cli binary")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -49,7 +49,9 @@ async fn write_ids(dir: &Path, name: &str, ids: &[i32]) -> PathBuf {
     let batch =
         RecordBatch::try_new(id_schema(), vec![Arc::new(Int32Array::from(ids.to_vec()))]).unwrap();
     let iter = RecordBatchIterator::new(vec![Ok(batch)].into_iter(), id_schema());
-    arrs::lance::write_dataset(&path, iter).await.unwrap();
+    lance_cli::dataset::write_dataset(&path, iter)
+        .await
+        .unwrap();
     path
 }
 
@@ -63,7 +65,7 @@ fn completions_generate_for_every_shell() {
         let script = stdout_of(&out);
         assert!(!script.is_empty(), "completions {shell} produced no output");
         assert!(
-            script.contains("arrs"),
+            script.contains("lance-cli"),
             "completions {shell} script does not mention the program name:\n{script}"
         );
         // A dataset input must not be required, and no scan machinery runs, so
@@ -77,12 +79,12 @@ fn completions_generate_for_every_shell() {
 }
 
 #[test]
-fn completions_include_every_command_including_lance() {
+fn completions_include_every_command_including_metadata_ones() {
     // Grouping the top-level `--help` hides subcommands from the *help command
     // list* only (issue #50); completions are generated from a separate,
-    // un-hidden `Cli::command()`, so every command — general, Lance, and Setup —
-    // must still be completable. `fragments` (Lance) and `blob`/`diff` (general,
-    // format-agnostic) are the canaries.
+    // un-hidden `Cli::command()`, so every command — data, metadata, and Setup —
+    // must still be completable. `fragments` (metadata) and `blob`/`diff` (data)
+    // are the canaries.
     for shell in ["bash", "zsh", "fish"] {
         let script = stdout_of(&run(&["completions", shell]));
         for cmd in ["fragments", "search", "blob", "diff", "completions"] {
@@ -184,7 +186,7 @@ fn no_progress_is_accepted_everywhere() {
         let out = run(&args);
         assert!(
             out.status.success(),
-            "`arrs {}` with --no-progress failed: {}",
+            "`lance-cli {}` with --no-progress failed: {}",
             case.join(" "),
             String::from_utf8_lossy(&out.stderr)
         );

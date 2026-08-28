@@ -21,11 +21,11 @@ use lance_linalg::distance::DistanceType;
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
 
-use arrs::cli::{BinaryFormat, Format, LanceArgs};
-use arrs::dataset::{self, VectorSearchParams};
-use arrs::error::Error;
-use arrs::output::make_writer;
-use arrs::output::table::TableStyle;
+use lance_cli::cli::{BinaryFormat, Format, VersionArgs};
+use lance_cli::dataset::{self, VectorSearchParams};
+use lance_cli::error::Error;
+use lance_cli::output::make_writer;
+use lance_cli::output::table::TableStyle;
 
 use common::tempdir;
 
@@ -170,7 +170,7 @@ async fn build_vector_fixture(tmp: &TempDir, name: &str, with_index: bool) -> St
 
 /// Pull every row out of a search result as `(id, _distance)` pairs, in the
 /// order the stream yields them.
-async fn collect_id_distance(result: arrs::dataset::VectorSearchResult) -> Vec<(i32, f32)> {
+async fn collect_id_distance(result: lance_cli::dataset::VectorSearchResult) -> Vec<(i32, f32)> {
     use arrow_array::Float32Array;
     let mut stream = result.stream;
     let mut out = Vec::new();
@@ -201,7 +201,7 @@ fn search_with_index_returns_ordered_neighbors() {
         let tmp = tempdir();
         let path = build_vector_fixture(&tmp, "vec", true).await;
         let ds = dataset::open(&path, None).await.unwrap();
-        let lance = ds.lance().unwrap();
+        let lance = &ds;
 
         let query = vec![0.9_f32, 0.8, 0.1, 0.0];
         let params = VectorSearchParams {
@@ -231,7 +231,7 @@ fn search_without_index_falls_back_to_flat_knn() {
         let tmp = tempdir();
         let path = build_vector_fixture(&tmp, "vec", false).await;
         let ds = dataset::open(&path, None).await.unwrap();
-        let lance = ds.lance().unwrap();
+        let lance = &ds;
 
         let query = vec![0.9_f32, 0.8, 0.1, 0.0];
         let params = VectorSearchParams {
@@ -260,7 +260,7 @@ fn search_dimension_mismatch_is_precise() {
         let tmp = tempdir();
         let path = build_vector_fixture(&tmp, "vec", false).await;
         let ds = dataset::open(&path, None).await.unwrap();
-        let lance = ds.lance().unwrap();
+        let lance = &ds;
 
         let query = vec![0.1_f32, 0.2]; // 2 dims vs column's 4
         let params = VectorSearchParams {
@@ -296,7 +296,7 @@ fn search_on_non_vector_column_errors() {
         let tmp = tempdir();
         let path = build_vector_fixture(&tmp, "vec", false).await;
         let ds = dataset::open(&path, None).await.unwrap();
-        let lance = ds.lance().unwrap();
+        let lance = &ds;
 
         let query = vec![0.1_f32, 0.2, 0.3, 0.4];
         let params = VectorSearchParams {
@@ -321,7 +321,7 @@ fn search_projection_composes_with_distance() {
         let tmp = tempdir();
         let path = build_vector_fixture(&tmp, "vec", true).await;
         let ds = dataset::open(&path, None).await.unwrap();
-        let lance = ds.lance().unwrap();
+        let lance = &ds;
 
         let query = vec![0.9_f32, 0.8, 0.1, 0.0];
         let projection = vec!["id".to_string()];
@@ -348,10 +348,10 @@ fn search_projection_may_name_distance_explicitly() {
         let tmp = tempdir();
         let path = build_vector_fixture(&tmp, "vec", true).await;
         let ds = dataset::open(&path, None).await.unwrap();
-        let lance = ds.lance().unwrap();
+        let lance = &ds;
 
         let query = vec![0.9_f32, 0.8, 0.1, 0.0];
-        // The adapter force-includes `_distance`; naming it explicitly must not
+        // The search force-includes `_distance`; naming it explicitly must not
         // produce a duplicate column.
         let projection = vec!["id".to_string(), "_distance".to_string()];
         let params = VectorSearchParams {
@@ -380,7 +380,7 @@ fn search_output_works_in_all_formats() {
         let tmp = tempdir();
         let path = build_vector_fixture(&tmp, "vec", true).await;
         let ds = dataset::open(&path, None).await.unwrap();
-        let lance = ds.lance().unwrap();
+        let lance = &ds;
 
         let query = vec![0.9_f32, 0.8, 0.1, 0.0];
         for format in [Format::Jsonl, Format::Csv, Format::Table] {
@@ -420,7 +420,7 @@ fn search_output_works_in_all_formats() {
     });
 }
 
-// ----------------------------- adapter-level --------------------------------
+// ----------------------------- dataset-level --------------------------------
 
 #[test]
 fn list_versions_tagged_only_returns_only_tagged() {
@@ -428,7 +428,7 @@ fn list_versions_tagged_only_returns_only_tagged() {
         let tmp = tempdir();
         let path = build_fixture(&tmp, "ds").await;
         let ds = dataset::open(&path, None).await.unwrap();
-        let lance = ds.lance().unwrap();
+        let lance = &ds;
 
         let versions = lance.list_versions(None, true).await.unwrap();
         assert_eq!(versions.len(), 1);
@@ -443,7 +443,7 @@ fn list_versions_default_lists_all_main_versions() {
         let tmp = tempdir();
         let path = build_fixture(&tmp, "ds").await;
         let ds = dataset::open(&path, None).await.unwrap();
-        let lance = ds.lance().unwrap();
+        let lance = &ds;
 
         // tagged_only = false (the CLI default) → every version is listed.
         let versions = lance.list_versions(None, false).await.unwrap();
@@ -459,7 +459,7 @@ fn list_branches_includes_main_and_dev() {
         let tmp = tempdir();
         let path = build_fixture(&tmp, "ds").await;
         let ds = dataset::open(&path, None).await.unwrap();
-        let lance = ds.lance().unwrap();
+        let lance = &ds;
 
         let branches = lance.list_branches().await.unwrap();
         let names: Vec<&str> = branches.iter().map(|b| b.name.as_str()).collect();
@@ -488,10 +488,10 @@ fn list_tags_returns_cross_branch_view() {
             .unwrap();
 
         let ds = dataset::open(&path, None).await.unwrap();
-        let lance = ds.lance().unwrap();
+        let lance = &ds;
         let tags = lance.list_tags().await.unwrap();
 
-        let by_name: std::collections::HashMap<&str, &arrs::dataset::TagInfo> =
+        let by_name: std::collections::HashMap<&str, &lance_cli::dataset::TagInfo> =
             tags.iter().map(|t| (t.name.as_str(), t)).collect();
         let v2 = by_name.get("v2-tag").expect("v2-tag listed");
         assert_eq!(v2.branch, "main");
@@ -511,26 +511,26 @@ fn checkout_state_reports_branch_and_version() {
         let path = build_fixture(&tmp, "ds").await;
 
         // Version-pinned handle on main.
-        let lance_args = LanceArgs {
+        let lance_args = VersionArgs {
             version: Some(2),
-            ..LanceArgs::default()
+            ..VersionArgs::default()
         };
         let ds = dataset::open(&path, Some(&lance_args)).await.unwrap();
-        let state = ds.lance().unwrap().checkout_state();
+        let state = ds.checkout_state();
         assert_eq!(state.branch, "main");
         assert_eq!(state.version, 2);
 
         // Latest of main (no selectors) sees v3.
         let ds = dataset::open(&path, None).await.unwrap();
-        assert_eq!(ds.lance().unwrap().checkout_state().version, 3);
+        assert_eq!(ds.checkout_state().version, 3);
 
         // A branch handle reports its branch.
-        let dev_args = LanceArgs {
+        let dev_args = VersionArgs {
             branch: Some("dev".to_string()),
-            ..LanceArgs::default()
+            ..VersionArgs::default()
         };
         let ds = dataset::open(&path, Some(&dev_args)).await.unwrap();
-        assert_eq!(ds.lance().unwrap().checkout_state().branch, "dev");
+        assert_eq!(ds.checkout_state().branch, "dev");
     });
 }
 
@@ -540,7 +540,7 @@ fn list_indices_finds_btree_index() {
         let tmp = tempdir();
         let path = build_fixture_with_index(&tmp, "ds").await;
         let ds = dataset::open(&path, None).await.unwrap();
-        let lance = ds.lance().unwrap();
+        let lance = &ds;
 
         let indices = lance.list_indices().await.unwrap();
         assert_eq!(indices.len(), 1);
@@ -563,7 +563,7 @@ fn index_stats_counts_change_when_rows_appended_after_indexing() {
         ds.append(iter, None).await.unwrap();
 
         let ds = dataset::open(&path, None).await.unwrap();
-        let lance = ds.lance().unwrap();
+        let lance = &ds;
 
         let stats = lance.index_stats().await.unwrap();
         assert_eq!(stats.len(), 1);
@@ -612,7 +612,7 @@ fn list_fragments_reports_rows_files_and_sizes() {
         let tmp = tempdir();
         let path = build_fragmented(&tmp, "ds", false).await;
         let ds = dataset::open(&path, None).await.unwrap();
-        let lance = ds.lance().unwrap();
+        let lance = &ds;
 
         let fragments = lance.list_fragments(true).await.unwrap();
         // Three appends → three fragments, each with two physical rows.
@@ -640,7 +640,7 @@ fn list_fragments_counts_deleted_rows() {
         let tmp = tempdir();
         let path = build_fragmented(&tmp, "ds", true).await;
         let ds = dataset::open(&path, None).await.unwrap();
-        let lance = ds.lance().unwrap();
+        let lance = &ds;
 
         let fragments = lance.list_fragments(false).await.unwrap();
         let total_deleted: u64 = fragments.iter().map(|f| f.deleted_rows).sum();
@@ -659,7 +659,7 @@ fn list_fragments_no_size_leaves_size_unset() {
         let tmp = tempdir();
         let path = build_fragmented(&tmp, "ds", false).await;
         let ds = dataset::open(&path, None).await.unwrap();
-        let lance = ds.lance().unwrap();
+        let lance = &ds;
 
         let fragments = lance.list_fragments(false).await.unwrap();
         assert!(!fragments.is_empty());
@@ -674,12 +674,12 @@ fn list_fragments_respects_version_checkout() {
         let path = build_fragmented(&tmp, "ds", false).await;
 
         // Version 1 predates the two appends → a single fragment.
-        let lance_args = LanceArgs {
+        let lance_args = VersionArgs {
             version: Some(1),
-            ..LanceArgs::default()
+            ..VersionArgs::default()
         };
         let ds = dataset::open(&path, Some(&lance_args)).await.unwrap();
-        let lance = ds.lance().unwrap();
+        let lance = &ds;
         let fragments = lance.list_fragments(false).await.unwrap();
         assert_eq!(fragments.len(), 1);
         assert_eq!(fragments[0].physical_rows, 2);
@@ -696,14 +696,14 @@ fn manifest_version_reflects_checkout() {
         let path = build_fixture(&tmp, "ds").await;
 
         let ds = dataset::open(&path, None).await.unwrap();
-        assert_eq!(ds.lance().unwrap().manifest_version(), 3);
+        assert_eq!(ds.manifest_version(), 3);
 
-        let at_v1 = LanceArgs {
+        let at_v1 = VersionArgs {
             version: Some(1),
-            ..LanceArgs::default()
+            ..VersionArgs::default()
         };
         let ds = dataset::open(&path, Some(&at_v1)).await.unwrap();
-        assert_eq!(ds.lance().unwrap().manifest_version(), 1);
+        assert_eq!(ds.manifest_version(), 1);
     });
 }
 
@@ -728,7 +728,7 @@ fn index_stats_empty_index_has_undefined_coverage() {
         .unwrap();
 
         let ds = dataset::open(&uri, None).await.unwrap();
-        let lance = ds.lance().unwrap();
+        let lance = &ds;
 
         let stats = lance.index_stats().await.unwrap();
         assert_eq!(stats.len(), 1);
@@ -747,9 +747,9 @@ fn checkout_by_version_yields_old_rowcount() {
         let tmp = tempdir();
         let path = build_fixture(&tmp, "ds").await;
 
-        let lance = LanceArgs {
+        let lance = VersionArgs {
             version: Some(1),
-            ..LanceArgs::default()
+            ..VersionArgs::default()
         };
         let ds = dataset::open(&path, Some(&lance)).await.unwrap();
         assert_eq!(ds.count_rows(None).await.unwrap(), 2);
@@ -762,9 +762,9 @@ fn checkout_by_tag_yields_tagged_rowcount() {
         let tmp = tempdir();
         let path = build_fixture(&tmp, "ds").await;
 
-        let lance = LanceArgs {
+        let lance = VersionArgs {
             tag: Some("v2-tag".to_string()),
-            ..LanceArgs::default()
+            ..VersionArgs::default()
         };
         let ds = dataset::open(&path, Some(&lance)).await.unwrap();
         // v2 = v1 (2 rows) + v2 append (1 row) = 3 rows
@@ -778,9 +778,9 @@ fn checkout_by_branch_uses_branch_latest() {
         let tmp = tempdir();
         let path = build_fixture(&tmp, "ds").await;
 
-        let lance = LanceArgs {
+        let lance = VersionArgs {
             branch: Some("dev".to_string()),
-            ..LanceArgs::default()
+            ..VersionArgs::default()
         };
         let ds = dataset::open(&path, Some(&lance)).await.unwrap();
         // dev was branched from v2 of main and never appended to → 3 rows.
@@ -795,13 +795,16 @@ fn checkout_tag_with_mismatched_branch_errors() {
         let path = build_fixture(&tmp, "ds").await;
 
         // v2-tag was created on `main`; asking for it via --branch dev must error.
-        let lance = LanceArgs {
+        let lance = VersionArgs {
             tag: Some("v2-tag".to_string()),
             branch: Some("dev".to_string()),
-            ..LanceArgs::default()
+            ..VersionArgs::default()
         };
         let err = dataset::open(&path, Some(&lance)).await.unwrap_err();
-        assert!(matches!(err, arrs::error::Error::TagBranchMismatch { .. }));
+        assert!(matches!(
+            err,
+            lance_cli::error::Error::TagBranchMismatch { .. }
+        ));
     });
 }
 
@@ -811,10 +814,10 @@ fn checkout_tag_with_matching_branch_ok() {
         let tmp = tempdir();
         let path = build_fixture(&tmp, "ds").await;
 
-        let lance = LanceArgs {
+        let lance = VersionArgs {
             tag: Some("v2-tag".to_string()),
             branch: Some("main".to_string()),
-            ..LanceArgs::default()
+            ..VersionArgs::default()
         };
         let ds = dataset::open(&path, Some(&lance)).await.unwrap();
         assert_eq!(ds.count_rows(None).await.unwrap(), 3);
@@ -827,9 +830,9 @@ fn checkout_unknown_branch_errors() {
         let tmp = tempdir();
         let path = build_fixture(&tmp, "ds").await;
 
-        let lance = LanceArgs {
+        let lance = VersionArgs {
             branch: Some("nope".to_string()),
-            ..LanceArgs::default()
+            ..VersionArgs::default()
         };
         let res = dataset::open(&path, Some(&lance)).await;
         assert!(res.is_err());
@@ -864,11 +867,11 @@ async fn version_times(path: &str, branch: Option<&str>) -> Vec<(u64, DateTime<U
     v
 }
 
-fn as_of_args(target: DateTime<Utc>, branch: Option<&str>) -> LanceArgs {
-    LanceArgs {
+fn as_of_args(target: DateTime<Utc>, branch: Option<&str>) -> VersionArgs {
+    VersionArgs {
         as_of: Some(target.to_rfc3339()),
         branch: branch.map(str::to_string),
-        ..LanceArgs::default()
+        ..VersionArgs::default()
     }
 }
 
@@ -999,9 +1002,9 @@ fn as_of_accepts_date_only_format() {
         let path = build_fixture(&tmp, "ds").await;
 
         // A date far in the future (midnight UTC) selects the latest version.
-        let lance = LanceArgs {
+        let lance = VersionArgs {
             as_of: Some("2999-01-01".to_string()),
-            ..LanceArgs::default()
+            ..VersionArgs::default()
         };
         let ds = dataset::open(&path, Some(&lance)).await.unwrap();
         assert_eq!(ds.count_rows(None).await.unwrap(), 4);
@@ -1014,9 +1017,9 @@ fn as_of_accepts_naive_datetime_format() {
         let tmp = tempdir();
         let path = build_fixture(&tmp, "ds").await;
 
-        let lance = LanceArgs {
+        let lance = VersionArgs {
             as_of: Some("2999-01-01T00:00:00".to_string()),
-            ..LanceArgs::default()
+            ..VersionArgs::default()
         };
         let ds = dataset::open(&path, Some(&lance)).await.unwrap();
         assert_eq!(ds.count_rows(None).await.unwrap(), 4);
@@ -1029,9 +1032,9 @@ fn as_of_invalid_format_errors() {
         let tmp = tempdir();
         let path = build_fixture(&tmp, "ds").await;
 
-        let lance = LanceArgs {
+        let lance = VersionArgs {
             as_of: Some("yesterday".to_string()),
-            ..LanceArgs::default()
+            ..VersionArgs::default()
         };
         let err = dataset::open(&path, Some(&lance)).await.unwrap_err();
         assert!(matches!(err, Error::InvalidAsOf(_)));
@@ -1039,7 +1042,7 @@ fn as_of_invalid_format_errors() {
 }
 
 #[test]
-fn open_non_lance_path_errors_with_unknown_format() {
+fn open_non_lance_path_errors_with_not_a_lance_dataset() {
     // A directory that lacks `_versions/` is not recognised as a Lance dataset.
     runtime().block_on(async {
         let tmp = tempdir();
@@ -1048,14 +1051,17 @@ fn open_non_lance_path_errors_with_unknown_format() {
         let err = dataset::open(path.to_str().unwrap(), None)
             .await
             .unwrap_err();
-        assert!(matches!(err, arrs::error::Error::UnknownFormat { .. }));
+        assert!(matches!(
+            err,
+            lance_cli::error::Error::NotLanceDataset { .. }
+        ));
     });
 }
 
 #[test]
 fn open_via_file_uri_scheme_matches_local_path() {
-    // A `file://` URI takes the scheme-qualified dispatch path (no local
-    // `_versions/` probe) yet must resolve to the same local dataset.
+    // A `file://` URI skips the local `_versions/` probe (it is resolved by the
+    // object store) yet must resolve to the same local dataset.
     runtime().block_on(async {
         let tmp = tempdir();
         let uri = build_fixture(&tmp, "ds").await; // absolute local path
@@ -1069,7 +1075,7 @@ fn open_via_file_uri_scheme_matches_local_path() {
 
 #[test]
 fn open_nonexistent_scheme_uri_errors_with_uri_in_message() {
-    // Scheme-qualified inputs skip the local heuristic and defer to the adapter,
+    // Scheme-qualified inputs skip the local heuristic and defer to Lance,
     // whose error must name the offending URI and carry a readable cause rather
     // than a raw debug dump.
     runtime().block_on(async {
@@ -1078,7 +1084,7 @@ fn open_nonexistent_scheme_uri_errors_with_uri_in_message() {
 
         let err = dataset::open(&missing, None).await.unwrap_err();
         match &err {
-            arrs::error::Error::LanceOpen { path, source } => {
+            lance_cli::error::Error::LanceOpen { path, source } => {
                 assert_eq!(path, &missing);
                 // The wrapped cause is surfaced via Display, not `{:?}`.
                 assert!(!format!("{source}").is_empty());

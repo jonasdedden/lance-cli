@@ -42,7 +42,7 @@ use futures::StreamExt as _;
 
 use crate::Result;
 use crate::commands::progress::ScanProgress;
-use crate::dataset::{ColumnStats, Dataset, ScanOptions};
+use crate::dataset::{ColumnStats, LanceDataset, ScanOptions};
 use crate::error::Error;
 use crate::output::RenderOptions;
 use crate::output::value::table_cell;
@@ -55,11 +55,8 @@ pub const DISTINCT_CAP: usize = 10_000;
 /// Compute per-column statistics for `ds`, restricted to `projection` columns
 /// (all columns when `None`) and to rows matching `filter` (all rows when
 /// `None`). Rows are streamed; memory is independent of the row count.
-///
-/// A backend may short-circuit the scan via the `Dataset::stats` hook; when it
-/// returns `None` (the default) this falls back to a streaming scan fold.
 pub async fn compute(
-    ds: &dyn Dataset,
+    ds: &LanceDataset,
     progress: &ScanProgress,
     projection: Option<&[String]>,
     filter: Option<&str>,
@@ -69,18 +66,6 @@ pub async fn compute(
         filter,
         ..Default::default()
     };
-
-    // Give the backend a chance to answer from metadata instead of scanning.
-    //
-    // Progress trap: no backend overrides `Dataset::stats` today, so this branch
-    // is never taken and the caller's `ScanProgress` (built before this call)
-    // always drives the scan below. If a backend ever implements this hook, this
-    // early return would leave that bar created-but-never-advanced. Whoever adds
-    // a metadata `stats` implementation must construct/skip the progress bar
-    // around this decision instead — the caller cannot know the answer up front.
-    if let Some(result) = ds.stats(&options).await {
-        return result;
-    }
 
     // Build one accumulator per projected column, up front, so that an empty
     // dataset (or a fully filtered-out one) still yields a row per column.
@@ -96,7 +81,7 @@ pub async fn compute(
         let batch = batch?;
         // Accumulators are indexed positionally, so the scan must yield columns
         // in the projected order. Guard that invariant in debug builds: a future
-        // backend that reorders projected columns would otherwise silently
+        // change that reorders projected columns would otherwise silently
         // misattribute statistics.
         debug_assert!(
             accs.iter()

@@ -46,7 +46,7 @@ jobs:
       - run: cargo test --locked
 
   # ──────────────────────────────────────────────────────────────────
-  # Wheel build: For shipping `arrs` to pure Python users
+  # Wheel build: For shipping `lance-cli` to pure Python users
   # ──────────────────────────────────────────────────────────────────
   wheel:
     name: wheel · ${{ matrix.os }}

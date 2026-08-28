@@ -3,10 +3,10 @@
 Every command accepts an object-store URI wherever it accepts a local path.
 
 ```sh
-arrs head -n 5 s3://my-bucket/datasets/embeddings.lance
-arrs rowcount gs://analytics/events.lance
-arrs schema az://container/data.lance
-arrs versions s3://my-bucket/datasets/embeddings.lance
+lance-cli head -n 5 s3://my-bucket/datasets/embeddings.lance
+lance-cli rowcount gs://analytics/events.lance
+lance-cli schema az://container/data.lance
+lance-cli versions s3://my-bucket/datasets/embeddings.lance
 ```
 
 | Scheme | Backend | Credentials |
@@ -17,7 +17,7 @@ arrs versions s3://my-bucket/datasets/embeddings.lance
 | `file://` | Local filesystem | none |
 | *(none)* | Local filesystem | none |
 
-Credentials come only from the ambient environment; there are no arrs-specific
+Credentials come only from the ambient environment; there are no lance-cli-specific
 credential flags. A bare path, relative or absolute, always resolves to the
 local filesystem. Object-store errors such as missing credentials, 404, or
 permission denied are reported with the offending URI and the underlying cause.

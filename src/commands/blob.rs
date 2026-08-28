@@ -26,8 +26,8 @@ use arrow_schema::DataType;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 use crate::Result;
-use crate::cli::LanceArgs;
-use crate::dataset::{self, BlobRead};
+use crate::cli::VersionArgs;
+use crate::dataset::{self, BlobReader};
 use crate::error::Error;
 use crate::indices;
 use crate::row_id::RowIds;
@@ -41,7 +41,7 @@ enum Payload {
     /// Fully materialized bytes from a plain binary column.
     Bytes(Vec<u8>),
     /// A streaming reader over a Lance blob-encoded cell.
-    Blob(Box<dyn BlobRead>),
+    Blob(BlobReader),
 }
 
 pub async fn run(
@@ -49,9 +49,9 @@ pub async fn run(
     column: &str,
     index: i64,
     output: Option<&Path>,
-    lance: &LanceArgs,
+    version: &VersionArgs,
 ) -> Result<()> {
-    let ds = dataset::open(input, Some(lance)).await?;
+    let ds = dataset::open(input, Some(version)).await?;
     let schema = ds.arrow_schema();
 
     // Validate the column exists up front for a precise error, independent of
@@ -76,13 +76,8 @@ pub async fn run(
     // through the plain-binary `take` path. The blob check comes first because a
     // blob column's arrow type is (Large)Binary too — its metadata is what
     // distinguishes it.
-    let payload = if ds.lance().is_some_and(|l| l.is_blob_column(column)) {
-        let reader = ds
-            .lance()
-            .expect("checked is_some above")
-            .open_blob(column, idx)
-            .await?;
-        match reader {
+    let payload = if ds.is_blob_column(column) {
+        match ds.open_blob(column, idx).await? {
             Some(reader) => Payload::Blob(reader),
             None => {
                 return Err(Error::NullBlobCell {
@@ -204,7 +199,7 @@ async fn write_to_file(path: &Path, payload: Payload) -> Result<()> {
 /// colliding on the same target.
 fn temp_path(path: &Path) -> PathBuf {
     let mut os = path.to_path_buf().into_os_string();
-    os.push(format!(".arrs-blob-{}.tmp", std::process::id()));
+    os.push(format!(".lance-cli-blob-{}.tmp", std::process::id()));
     PathBuf::from(os)
 }
 

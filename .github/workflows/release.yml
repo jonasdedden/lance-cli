@@ -1,12 +1,15 @@
 name: Release
 
-# Triggered by pushing an annotated tag matching `v*` (e.g. v0.1.0,
-# v0.2.0-rc1). Also exposes a `workflow_dispatch` button so a
-# release-engineer can rebuild artifacts for an existing tag without
-# re-pushing it (useful when a runner died mid-matrix).
+# Normally triggered by pushing an annotated tag matching `v*` (e.g. v0.1.0,
+# v0.2.0-rc1). That trigger is commented out for now — see below. The
+# `workflow_dispatch` button remains, so a release-engineer can still build
+# artifacts for an existing tag by hand (also useful when a runner died
+# mid-matrix).
 on:
-  push:
-    tags: ["v*"]
+  # Disabled until the repo moves into the Lance namespace — re-enable
+  # alongside the first lance-cli release.
+  # push:
+  #   tags: ["v*"]
   workflow_dispatch:
     inputs:
       ref:
@@ -222,13 +225,13 @@ jobs:
        run: |
          v="${{ needs.verify.outputs.version }}"
          for _ in $(seq 1 10); do
-           if curl -sSf -H "User-Agent: arrs-release (mail@jonas-dedden.de)" \
-                "https://crates.io/api/v1/crates/arrs-cli/$v" > /dev/null; then
-             echo "arrs-cli $v is live"; exit 0
+           if curl -sSf -H "User-Agent: lance-cli-release (mail@jonas-dedden.de)" \
+                "https://crates.io/api/v1/crates/lance-cli/$v" > /dev/null; then
+             echo "lance-cli $v is live"; exit 0
            fi
            sleep 15
          done
-         echo "::error::arrs-cli $v never appeared on crates.io"
+         echo "::error::lance-cli $v never appeared on crates.io"
          exit 1
 
   # ──────────────────────────────────────────────────────────────────
@@ -244,7 +247,7 @@ jobs:
    runs-on: ubuntu-latest
    environment:
      name: pypi
-     url: https://pypi.org/project/rust-arrs
+     url: https://pypi.org/project/lance-cli
    permissions:
      id-token: write   # OIDC token for trusted publishing
    steps:
@@ -259,10 +262,10 @@ jobs:
        run: |
          v="${{ needs.verify.outputs.version }}"
          for _ in $(seq 1 10); do
-           if curl -sSf "https://pypi.org/pypi/rust-arrs/$v/json" > /dev/null; then
-             echo "rust-arrs $v is live"; exit 0
+           if curl -sSf "https://pypi.org/pypi/lance-cli/$v/json" > /dev/null; then
+             echo "lance-cli $v is live"; exit 0
            fi
            sleep 15
          done
-         echo "::error::rust-arrs $v never appeared on PyPI"
+         echo "::error::lance-cli $v never appeared on PyPI"
          exit 1

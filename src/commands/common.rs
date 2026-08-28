@@ -5,33 +5,21 @@ use arrow_schema::{Schema, SchemaRef};
 
 use crate::Result;
 use crate::cli::Format;
-use crate::dataset::Dataset;
-use crate::error::Error;
 use crate::output::table::TableStyle;
 use crate::output::{RenderOptions, RowWriter, make_writer};
 use crate::row_id::{self, RowIds};
 
-/// Validate the `--with-row-id` / `--with-row-addr` flags for a row-producing
-/// command and reconcile them with the projection, returning the `--columns`
-/// list with any redundant system-column names stripped (ready for
-/// [`crate::projection::resolve`]).
+/// Reconcile the `--with-row-id` / `--with-row-addr` flags with the projection,
+/// returning the `--columns` list with any redundant system-column names
+/// stripped (ready for [`crate::projection::resolve`]).
 ///
-/// * Errors with [`Error::RowIdUnsupported`] when a flag is set on a format that
-///   can't provide the pseudo-columns (keeping the command code uniform across
-///   backends).
-/// * Errors with [`Error::RowIdExcluded`] when a requested pseudo-column is
-///   explicitly named in `--exclude-columns`.
+/// Errors with [`Error::RowIdExcluded`] when a requested pseudo-column is
+/// explicitly named in `--exclude-columns`.
 pub fn prepare_row_id_columns(
-    ds: &dyn Dataset,
     columns: Option<&[String]>,
     exclude: Option<&[String]>,
     row_ids: RowIds,
 ) -> Result<Option<Vec<String>>> {
-    if row_ids.any() && !ds.supports_row_id() {
-        return Err(Error::RowIdUnsupported {
-            path: ds.origin().to_string(),
-        });
-    }
     row_id::validate_exclude(exclude, row_ids)?;
     Ok(row_id::strip_columns(columns, row_ids))
 }

@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::Result;
-use crate::cli::{Format, LanceArgs};
+use crate::cli::{Format, VersionArgs};
 use crate::commands::common::{
     make_stdout_writer, prepare_row_id_columns, project_arrow_schema, schemas_match,
 };
@@ -23,7 +23,7 @@ pub async fn run(
     exclude: Option<&[String]>,
     filter: Option<&str>,
     row_ids: RowIds,
-    lance: &LanceArgs,
+    version: &VersionArgs,
     show_progress: bool,
 ) -> Result<()> {
     if inputs.is_empty() {
@@ -36,21 +36,11 @@ pub async fn run(
 
     let mut opened = Vec::with_capacity(inputs.len());
     for path in &inputs {
-        let ds = dataset::open(path, Some(lance)).await?;
-        // Row-id support is per-dataset: `cat` may one day concatenate mixed
-        // formats, so verify every input can honour the flags, not just the
-        // first. (`prepare_row_id_columns` below re-checks the first for the
-        // exclude/strip reconciliation; the duplicate is a cheap bool.)
-        if row_ids.any() && !ds.supports_row_id() {
-            return Err(Error::RowIdUnsupported {
-                path: ds.origin().to_string(),
-            });
-        }
-        opened.push(ds);
+        opened.push(dataset::open(path, Some(version)).await?);
     }
 
     let first_schema = opened[0].arrow_schema();
-    let columns = prepare_row_id_columns(opened[0].as_ref(), columns, exclude, row_ids)?;
+    let columns = prepare_row_id_columns(columns, exclude, row_ids)?;
     let projection = projection::resolve(&first_schema, columns.as_deref(), exclude)?;
     let projected_schema = project_arrow_schema(first_schema.as_ref(), projection.as_deref());
     let projected_schema = row_id::extend_schema(&projected_schema, row_ids);
@@ -87,7 +77,7 @@ pub async fn run(
     };
     let progress = ScanProgress::new(show_progress, total);
 
-    // Open every scan first: the adapter validates the predicate eagerly, so a
+    // Open every scan first: the scan validates the predicate eagerly, so a
     // bad `--where` errors here, before we emit the output header to stdout.
     let mut streams = Vec::with_capacity(opened.len());
     for ds in &opened {

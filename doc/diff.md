@@ -1,15 +1,15 @@
 # Diffing datasets and versions
 
-`arrs diff` has two modes, chosen by how many datasets you name:
+`lance-cli diff` has two modes, chosen by how many datasets you name:
 
 | Invocation | Mode | Compares |
 |---|---|---|
-| `arrs diff A B` | dataset-vs-dataset | Two different datasets, any backend. |
-| `arrs diff DS --from <ref> …` | version | Two versions of one Lance dataset. |
+| `lance-cli diff A B` | dataset-vs-dataset | Two different datasets. |
+| `lance-cli diff DS --from <ref> …` | version | Two versions of one dataset. |
 
 The rules keep the modes apart:
 
-- A second dataset selects dataset-vs-dataset mode. The Lance version selectors
+- A second dataset selects dataset-vs-dataset mode. The version selectors
   (`--from`, `--to`, `--from-tag`, `--to-tag`, `--branch`) are ambiguous across
   two datasets, so combining any of them with a second dataset is an error.
 - A single dataset with at least one of `--from` or `--from-tag` selects
@@ -23,13 +23,13 @@ under `--format jsonl`. The rendering flags (`--max-list-items`,
 ## Dataset vs dataset
 
 Compares schema, schema metadata, and row count, which answers whether
-`part_b` is schema-compatible with `part_a` or whether an export lost rows. It
-works on any backend, and neither input takes version selectors.
+`part_b` is schema-compatible with `part_a` or whether an export lost rows.
+Neither input takes version selectors.
 
 ```sh
-arrs diff part_a.lance part_b.lance
-arrs diff part_a.lance part_b.lance --columns id,score
-arrs diff part_a.lance part_b.lance --format jsonl
+lance-cli diff part_a.lance part_b.lance
+lance-cli diff part_a.lance part_b.lance --columns id,score
+lance-cli diff part_a.lance part_b.lance --format jsonl
 ```
 
 It reports:
@@ -70,10 +70,10 @@ fragment, schema, and index metadata, so almost all of the report is derived
 without scanning data.
 
 ```sh
-arrs diff dataset.lance --from 3 --to 7
-arrs diff dataset.lance --from-tag release-1 --to-tag release-2
-arrs diff dataset.lance --from 3                  # --to defaults to branch latest
-arrs diff dataset.lance --branch dev --from 2 --to 5
+lance-cli diff dataset.lance --from 3 --to 7
+lance-cli diff dataset.lance --from-tag release-1 --to-tag release-2
+lance-cli diff dataset.lance --from 3                  # --to defaults to branch latest
+lance-cli diff dataset.lance --branch dev --from 2 --to 5
 ```
 
 | Flag | Meaning |
@@ -85,7 +85,7 @@ arrs diff dataset.lance --branch dev --from 2 --to 5
 | `--branch <name>` | Scope both endpoints to this branch. Default `main`. |
 
 ```
-$ arrs diff dataset.lance --from 1
+$ lance-cli diff dataset.lance --from 1
 diff dataset.lance
   from  main v1
   to    main v2
@@ -133,20 +133,20 @@ Both modes follow `diff(1)`:
 | `1` | The two sides differ. |
 | `2` | Error: bad usage, missing dataset, cross-branch comparison, a second dataset mixed with version selectors. |
 
-Code `2` is used for every command error across `arrs`, so `1` unambiguously
+Code `2` is used for every command error across `lance-cli`, so `1` unambiguously
 means "the two sides differ" and is never confused with a failure.
 
 ```sh
 # Machine-readable version diff for a CI gate.
-arrs diff dataset.lance --from 3 --to 7 --format jsonl
+lance-cli diff dataset.lance --from 3 --to 7 --format jsonl
 
 # Compare two tagged releases and act on the exit code.
-if arrs diff dataset.lance --from-tag v1 --to-tag v2; then
+if lance-cli diff dataset.lance --from-tag v1 --to-tag v2; then
   echo "no changes"
 fi
 
 # Contract check: does a new export match the reference schema and row count?
-if ! arrs diff reference.lance export.lance; then
+if ! lance-cli diff reference.lance export.lance; then
   echo "export drifted from the reference" >&2
 fi
 ```

@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Renamed the project to `lance-cli`.** The crate on crates.io is now
+  `lance-cli` (was `arrs-cli`), the PyPI package is `lance-cli` (was
+  `rust-arrs`), the binary is `lance-cli` (was `arrs`), and the library is
+  `lance_cli` (was `arrs`). Reinstall under the new name; no flag, subcommand,
+  or output format changed. Existing shell-completion scripts are stale and
+  should be regenerated with `lance-cli completions <shell>`.
+- **The tool is now Lance-only.** It was structured to grow into other
+  Arrow-backed formats — a `Dataset` trait with a Lance adapter behind it, a
+  `LanceCapabilities` side-trait for everything Lance could do that the trait
+  could not express, and per-format capability probes. Nothing else was ever
+  implemented, so the indirection is gone: commands now talk to a concrete
+  `LanceDataset` directly.
+  - `--with-row-id` / `--with-row-addr` and `--branch` / `--version` / `--tag` /
+    `--as-of` are no longer documented as "Lance only", because everything is.
+  - Opening a path that is not a Lance dataset now reports `not a Lance
+    dataset: <path>` instead of `unrecognised dataset format at <path>`.
+  - The `--help` option group `Lance options` is now `Version options`;
+    `--with-row-id` / `--with-row-addr` moved to `Selection options`.
+  - The `--help` command sections are now `Commands` (everything that reads
+    rows, including `search`) and `Metadata commands` (everything answered from
+    the manifest), replacing the old format-agnostic/Lance-only split.
+  - `doc/lance.md` is now `doc/versions.md`.
+- Trimmed two dependencies that the crate no longer needs. `async-trait` is gone
+  entirely (nothing implements a trait any more), and `anyhow` moved to
+  `[dev-dependencies]` — only the fixture example ever used it, so it was being
+  pulled into every downstream build for nothing.
+
 ## [0.2.1] - 2026-08-27
 
 ### Changed

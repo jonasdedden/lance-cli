@@ -1,8 +1,8 @@
-# Lance versions, branches, tags, and row identity
+# Versions, branches, tags, and row identity
 
 ## Selecting a version
 
-A Lance dataset carries a per-branch linear version history. Tags are named
+A dataset carries a per-branch linear version history. Tags are named
 references to a `(branch, version)` pair. Four flags choose what to read:
 
 | Flag | Meaning |
@@ -30,27 +30,27 @@ instant before that is out of range for the branch even when it falls after the
 parent commit the branch forked from.
 
 ```sh
-arrs head -n 5 --version 3 dataset.lance
-arrs rowcount --tag release-2026-04 dataset.lance
-arrs cat --branch dev --columns id,score dataset.lance
+lance-cli head -n 5 --version 3 dataset.lance
+lance-cli rowcount --tag release-2026-04 dataset.lance
+lance-cli cat --branch dev --columns id,score dataset.lance
 
-arrs head -n 5 --as-of "2026-07-01T12:00:00Z" dataset.lance
-arrs rowcount --as-of 2026-07-01 dataset.lance
-arrs schema --branch dev --as-of "2026-06-15T09:30" dataset.lance
+lance-cli head -n 5 --as-of "2026-07-01T12:00:00Z" dataset.lance
+lance-cli rowcount --as-of 2026-07-01 dataset.lance
+lance-cli schema --branch dev --as-of "2026-06-15T09:30" dataset.lance
 ```
 
 ## Listing metadata
 
 ```sh
-arrs versions dataset.lance                # every version on main
-arrs versions --tagged-only dataset.lance  # only tagged versions
-arrs versions --branch dev dataset.lance
-arrs branches dataset.lance
-arrs tags dataset.lance                    # across every branch
-arrs indices dataset.lance
-arrs index-stats dataset.lance
-arrs fragments dataset.lance
-arrs stat dataset.lance
+lance-cli versions dataset.lance                # every version on main
+lance-cli versions --tagged-only dataset.lance  # only tagged versions
+lance-cli versions --branch dev dataset.lance
+lance-cli branches dataset.lance
+lance-cli tags dataset.lance                    # across every branch
+lance-cli indices dataset.lance
+lance-cli index-stats dataset.lance
+lance-cli fragments dataset.lance
+lance-cli stat dataset.lance
 ```
 
 ## Row identity
@@ -67,10 +67,10 @@ Both are `UInt64` and can be combined. They are appended after the projected
 columns, `_rowid` first:
 
 ```sh
-arrs head --with-row-id dataset.lance
+lance-cli head --with-row-id dataset.lance
 # {"id":1,"score":0.5,…,"_rowid":0}
 
-arrs head --columns id --with-row-id dataset.lance
+lance-cli head --columns id --with-row-id dataset.lance
 # {"id":1,"_rowid":0}
 ```
 
@@ -84,5 +84,3 @@ Values are consistent across commands for the same version: `head`, `take`, and
 `sample` report the same `_rowid` for a given row. They stay correct after
 deletions, so the surviving `_rowid`s of a deleted range are non-contiguous.
 
-These flags are Lance-only. A future backend that cannot provide row identity
-rejects them with `not supported by this format`.

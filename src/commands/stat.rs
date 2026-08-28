@@ -1,4 +1,4 @@
-//! `stat` — a one-screen dataset health summary (Lance only).
+//! `stat` — a one-screen dataset health summary.
 //!
 //! Unlike the per-column `stats` command (which scans the data), `stat` answers
 //! "how is this dataset doing?" purely from manifest metadata: rows, deletions,
@@ -14,10 +14,9 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::{Value, json};
 
 use crate::Result;
-use crate::cli::{Format, LanceArgs};
+use crate::cli::{Format, VersionArgs};
 use crate::commands::common::{human_bytes, make_stdout_writer};
 use crate::dataset::{self, FragmentInfo, IndexInfo, VersionInfo};
-use crate::error::Error;
 use crate::output::RenderOptions;
 
 /// Fragment count at/above which the "many small fragments" hint may fire.
@@ -68,26 +67,22 @@ impl DatasetStat {
 
 pub async fn run(
     input: &str,
-    lance: &LanceArgs,
+    version: &VersionArgs,
     no_size: bool,
     format: Format,
     render: RenderOptions,
 ) -> Result<()> {
-    let ds = dataset::open(input, Some(lance)).await?;
-    let caps = ds.lance().ok_or_else(|| Error::NotLance {
-        command: "stat",
-        path: input.to_string(),
-    })?;
+    let ds = dataset::open(input, Some(version)).await?;
 
     // All lookups are metadata-only and independent, so fire them concurrently.
     // `list_versions` is scoped to the selected branch so the version count
     // respects `--branch`; the other surfaces reflect the checked-out version.
     let (fragments, versions, branches, tags, indices) = futures::join!(
-        caps.list_fragments(!no_size),
-        caps.list_versions(lance.branch.as_deref(), false),
-        caps.list_branches(),
-        caps.list_tags(),
-        caps.list_indices(),
+        ds.list_fragments(!no_size),
+        ds.list_versions(version.branch.as_deref(), false),
+        ds.list_branches(),
+        ds.list_tags(),
+        ds.list_indices(),
     );
     let fragments = fragments?;
     let versions = versions?;
@@ -97,7 +92,7 @@ pub async fn run(
 
     let stat = build_stat(
         input.to_string(),
-        caps.manifest_version(),
+        ds.manifest_version(),
         ds.arrow_schema().fields().len() as u64,
         &fragments,
         &versions,

@@ -1,7 +1,7 @@
 use futures::StreamExt;
 
 use crate::Result;
-use crate::cli::{Format, LanceArgs};
+use crate::cli::{Format, VersionArgs};
 use crate::commands::common::{make_stdout_writer, prepare_row_id_columns, project_arrow_schema};
 use crate::commands::progress::ScanProgress;
 use crate::dataset::{self, ScanOptions};
@@ -19,12 +19,12 @@ pub async fn run(
     exclude: Option<&[String]>,
     filter: Option<&str>,
     row_ids: RowIds,
-    lance: &LanceArgs,
+    version: &VersionArgs,
     show_progress: bool,
 ) -> Result<()> {
-    let ds = dataset::open(input, Some(lance)).await?;
+    let ds = dataset::open(input, Some(version)).await?;
     let arrow_schema = ds.arrow_schema();
-    let columns = prepare_row_id_columns(ds.as_ref(), columns, exclude, row_ids)?;
+    let columns = prepare_row_id_columns(columns, exclude, row_ids)?;
     let projection = projection::resolve(&arrow_schema, columns.as_deref(), exclude)?;
     let projected_schema = project_arrow_schema(arrow_schema.as_ref(), projection.as_deref());
     let projected_schema = row_id::extend_schema(&projected_schema, row_ids);
@@ -35,7 +35,7 @@ pub async fn run(
     // unknown up front).
     let progress = ScanProgress::new(show_progress && filter.is_some(), None);
 
-    // Open the scan before emitting the header: the adapter validates the
+    // Open the scan before emitting the header: the scan validates the
     // predicate eagerly, so an invalid `--where` must not leave a stray header
     // on stdout.
     let mut stream = if limit > 0 {

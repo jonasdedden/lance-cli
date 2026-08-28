@@ -1,30 +1,28 @@
 [package]
-name = "arrs-cli"
+name = "lance-cli"
 version = "0.2.1"
 edition = "2024"
 rust-version = "1.95"
-description = "Command-line tool for inspecting Lance and other Arrow-based datasets."
+description = "Command-line tool for inspecting Lance datasets."
 license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/jonasdedden/arrs"
-documentation = "https://docs.rs/arrs-cli"
-repository = "https://github.com/jonasdedden/arrs"
+homepage = "https://github.com/jonasdedden/lance-cli"
+documentation = "https://docs.rs/lance-cli"
+repository = "https://github.com/jonasdedden/lance-cli"
 
 [lib]
-name = "arrs"
+name = "lance_cli"
 path = "src/lib.rs"
 
 [[bin]]
-name = "arrs"
+name = "lance-cli"
 path = "src/main.rs"
 
 [dependencies]
-anyhow = "1.0.102"
 arrow = { version = "57", features = ["prettyprint"] }
 arrow-array = "57"
 arrow-cast = "57"
 arrow-schema = "57"
-async-trait = "0.1.89"
 base64 = "0.22.1"
 chrono = "0.4.44"
 clap = { version = "4.6.1", features = ["derive"] }
@@ -55,6 +53,9 @@ thiserror = "2.0.18"
 tokio = { version = "1.52.1", features = ["macros", "rt-multi-thread", "fs", "io-std", "io-util"] }
 
 [dev-dependencies]
+# Only `examples/write_lance_fixture.rs` uses this; the crate itself reports
+# errors through `crate::Error`.
+anyhow = "1.0.102"
 lance-linalg = "4"
 tempfile = "3.27.0"
 

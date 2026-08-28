@@ -1,14 +1,12 @@
-//! `arrs diff <A> <B>` — schema + row-count diff between two DIFFERENT datasets.
+//! `lance-cli diff <A> <B>` — schema + row-count diff between two DIFFERENT datasets.
 //!
-//! This is the generic counterpart to the Lance version diff in
-//! `commands::lance::diff` (which compares two versions of *one* dataset). It is
-//! written entirely against the `Dataset` trait: two `open()` calls, a
+//! The counterpart to the version diff in `commands::version_diff` (which
+//! compares two versions of *one* dataset). It is two `open()` calls, a
 //! field-by-field schema comparison (shared with the version diff via
 //! `commands::diff_common`), an Arrow schema-metadata comparison, and two
-//! concurrent `count_rows()` calls. Nothing here assumes either input is Lance,
-//! so once more backends exist the command works across them unchanged.
+//! concurrent `count_rows()` calls.
 //!
-//! Because the two inputs are different datasets, Lance version selectors
+//! Because the two inputs are different datasets, the version selectors
 //! (`--branch`/`--version`/`--tag`) apply to neither side — they would be
 //! ambiguous. The dispatch layer rejects them in this mode; see
 //! `commands::dispatch`.
@@ -27,11 +25,11 @@ use crate::dataset;
 use crate::error::Error;
 use crate::projection;
 
-/// Run the generic two-dataset diff.
+/// Run the two-dataset diff.
 ///
 /// `columns`/`exclude` scope the comparison: the projection is resolved against
-/// *each* dataset's own schema (strictly, as everywhere else in arrs) and only
-/// the surviving columns are compared. Schema-level metadata is compared on the
+/// *each* dataset's own schema (strictly, as everywhere else in lance-cli) and
+/// only the surviving columns are compared. Schema-level metadata is compared on the
 /// full, unprojected schemas (metadata is dataset-level, not per-column).
 pub async fn run(
     left: &str,
@@ -60,7 +58,7 @@ pub async fn run(
     let right_full = right_ds.arrow_schema();
 
     // Scope the schema comparison to the projected columns. Resolving against
-    // each schema independently keeps every backend's strict-projection
+    // each schema independently keeps the strict-projection
     // behaviour: a scoped column absent on one side is a clear "unknown column"
     // error rather than a silent mismatch.
     // Wrap resolution errors with the offending side's path: with two inputs a

@@ -4,10 +4,10 @@ use arrow_array::RecordBatch;
 use futures::StreamExt;
 
 use crate::Result;
-use crate::cli::{Format, LanceArgs};
+use crate::cli::{Format, VersionArgs};
 use crate::commands::common::{make_stdout_writer, prepare_row_id_columns, project_arrow_schema};
 use crate::commands::progress::ScanProgress;
-use crate::dataset::{self, Dataset, ScanOptions};
+use crate::dataset::{self, LanceDataset, ScanOptions};
 use crate::output::RenderOptions;
 use crate::projection;
 use crate::row_id::{self, RowIds};
@@ -22,12 +22,12 @@ pub async fn run(
     exclude: Option<&[String]>,
     filter: Option<&str>,
     row_ids: RowIds,
-    lance: &LanceArgs,
+    version: &VersionArgs,
     show_progress: bool,
 ) -> Result<()> {
-    let ds = dataset::open(input, Some(lance)).await?;
+    let ds = dataset::open(input, Some(version)).await?;
     let arrow_schema = ds.arrow_schema();
-    let columns = prepare_row_id_columns(ds.as_ref(), columns, exclude, row_ids)?;
+    let columns = prepare_row_id_columns(columns, exclude, row_ids)?;
     let projection = projection::resolve(&arrow_schema, columns.as_deref(), exclude)?;
     let projected_schema = project_arrow_schema(arrow_schema.as_ref(), projection.as_deref());
     let projected_schema = row_id::extend_schema(&projected_schema, row_ids);
@@ -75,7 +75,7 @@ pub async fn run(
 /// Fast path: no filter, so `count_rows` + a single `take` of the trailing
 /// indices is exact and cheap.
 async fn tail_by_take(
-    ds: &dyn Dataset,
+    ds: &LanceDataset,
     limit: u64,
     projection: Option<&[String]>,
     row_ids: RowIds,
@@ -95,7 +95,7 @@ async fn tail_by_take(
 /// batches to cover the last `limit` rows. Memory is bounded to roughly
 /// `limit` rows plus one batch rather than the whole (filtered) result set.
 async fn tail_by_stream(
-    ds: &dyn Dataset,
+    ds: &LanceDataset,
     limit: u64,
     projection: Option<&[String]>,
     filter: &str,

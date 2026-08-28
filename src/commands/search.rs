@@ -5,7 +5,7 @@ use futures::StreamExt;
 use lance_index::vector::DIST_COL;
 
 use crate::Result;
-use crate::cli::{Format, LanceArgs};
+use crate::cli::{Format, VersionArgs};
 use crate::commands::common::make_stdout_writer;
 use crate::dataset::{self, VectorSearchParams};
 use crate::error::Error;
@@ -33,19 +33,15 @@ pub async fn run(
     render: RenderOptions,
     columns: Option<&[String]>,
     exclude: Option<&[String]>,
-    lance: &LanceArgs,
+    version: &VersionArgs,
 ) -> Result<()> {
     let vector = parse_query_vector(source)?;
 
-    let ds = dataset::open(input, Some(lance)).await?;
-    let lance_caps = ds.lance().ok_or_else(|| Error::NotLance {
-        command: "search",
-        path: input.to_string(),
-    })?;
+    let ds = dataset::open(input, Some(version)).await?;
 
     // `_distance` is always appended by the search, so tolerate the user naming
     // it explicitly in `--columns` (it isn't a real dataset column and would
-    // otherwise trip the projection resolver). Drop it here; the adapter
+    // otherwise trip the projection resolver). Drop it here; the search
     // re-adds it in the right place.
     let filtered_columns: Option<Vec<String>> = columns.map(|cols| {
         cols.iter()
@@ -64,7 +60,7 @@ pub async fn run(
         refine_factor,
         projection: projection.as_deref(),
     };
-    let result = lance_caps.search(&params).await?;
+    let result = ds.search(&params).await?;
 
     if !result.used_index {
         eprintln!(

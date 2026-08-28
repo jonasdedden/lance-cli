@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::cli::{Format, LanceArgs};
+use crate::cli::{Format, VersionArgs};
 use crate::commands::common::make_stdout_writer;
 use crate::commands::progress::ScanProgress;
 use crate::dataset;
@@ -7,7 +7,7 @@ use crate::output::RenderOptions;
 use crate::projection;
 use crate::stats;
 
-/// `arrs stats`: per-column summary statistics (a `df.describe()` for datasets).
+/// `lance-cli stats`: per-column summary statistics (a `df.describe()` for datasets).
 ///
 /// Streams the dataset once, folding `arrow` aggregate state per column, and
 /// prints one row per column through the shared metadata-table writer, so
@@ -21,10 +21,10 @@ pub async fn run(
     columns: Option<&[String]>,
     exclude: Option<&[String]>,
     filter: Option<&str>,
-    lance: &LanceArgs,
+    version: &VersionArgs,
     show_progress: bool,
 ) -> Result<()> {
-    let ds = dataset::open(input, Some(lance)).await?;
+    let ds = dataset::open(input, Some(version)).await?;
     let schema = ds.arrow_schema();
     let projection = projection::resolve(&schema, columns, exclude)?;
 

@@ -7,14 +7,14 @@ schema. `--exclude-columns` takes precedence over `--columns`.
 
 ```sh
 # Exact top-level names; your order is preserved.
-arrs cat --columns id,score dataset.lance
+lance-cli cat --columns id,score dataset.lance
 
 # Glob patterns.
-arrs head --columns 'emb_*' dataset.lance
-arrs cat  --exclude-columns 'raw_*,debug_*' dataset.lance
+lance-cli head --columns 'emb_*' dataset.lance
+lance-cli cat  --exclude-columns 'raw_*,debug_*' dataset.lance
 
 # Nested struct field paths.
-arrs head --columns meta.user.id,id dataset.lance
+lance-cli head --columns meta.user.id,id dataset.lance
 ```
 
 - Globs use `*` (any run of characters) and `?` (exactly one) and match
@@ -23,7 +23,7 @@ arrs head --columns meta.user.id,id dataset.lance
   exact name is.
 - Nested paths are validated against the Arrow schema, so `meta.nope` and
   `score.x` (traversal into a non-struct) fail with a message rather than a
-  backend panic.
+  panic deep inside Lance.
 - A token that exactly matches a top-level column always selects that literal
   column, which is how you pick a column named `a*b` or `meta.user`. This wins
   over glob and path interpretation.
@@ -57,7 +57,7 @@ yields `meta.user.name` and `meta.source`. Untouched struct columns stay whole.
 
 ## `--where`
 
-`--where` takes a SQL-style predicate, parsed by the backend (DataFusion SQL
+`--where` takes a SQL-style predicate, parsed by Lance (DataFusion SQL
 for Lance), and keeps the rows that match. It is available on `cat`, `head`,
 `tail`, `sample`, `rowcount`, `stats`, and `freq`.
 
@@ -67,12 +67,12 @@ before projection, so you can filter on a column you project away:
 `--columns id --where 'score > 1.5'`.
 
 ```sh
-arrs head -n 20 --where "score > 0.5 AND name LIKE 'a%'" dataset.lance
-arrs rowcount --where "label = 'spam'" dataset.lance
-arrs cat --where "created_at >= TIMESTAMP '2026-01-01'" --columns id,score dataset.lance
-arrs sample -n 100 --where "split = 'test'" dataset.lance
+lance-cli head -n 20 --where "score > 0.5 AND name LIKE 'a%'" dataset.lance
+lance-cli rowcount --where "label = 'spam'" dataset.lance
+lance-cli cat --where "created_at >= TIMESTAMP '2026-01-01'" --columns id,score dataset.lance
+lance-cli sample -n 100 --where "split = 'test'" dataset.lance
 ```
 
 `take --indices` addresses rows positionally, so combining it with `--where` is
-rejected. Invalid predicates surface the backend's parse error as
+rejected. Invalid predicates surface Lance's parse error as
 `invalid --where predicate: …`.

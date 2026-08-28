@@ -1,7 +1,7 @@
 use std::process::ExitCode;
 
-use arrs::cli::Cli;
-use arrs::commands::Outcome;
+use lance_cli::cli::Cli;
+use lance_cli::commands::Outcome;
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -12,11 +12,11 @@ async fn main() -> ExitCode {
     // differences, 2 = error. Note this makes the error code 2 for *every*
     // command (it was 1 before `diff` landed), so 1 unambiguously means
     // "diff: the two versions differ" and never gets conflated with a failure.
-    match arrs::commands::dispatch(cli).await {
+    match lance_cli::commands::dispatch(cli).await {
         Ok(Outcome::Success) => ExitCode::SUCCESS,
         Ok(Outcome::Different) => ExitCode::from(1),
         Err(err) => {
-            eprintln!("arrs: {err}");
+            eprintln!("lance-cli: {err}");
             let mut source = std::error::Error::source(&err);
             while let Some(cause) = source {
                 eprintln!("  caused by: {cause}");

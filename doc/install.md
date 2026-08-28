@@ -3,25 +3,25 @@
 ## Prebuilt binary
 
 ```sh
-uv tool install rust-arrs
+uv tool install lance-cli
 ```
 
-The PyPI package `rust-arrs` ships the `arrs` binary; `pipx install rust-arrs`
-works the same way.
+The PyPI package `lance-cli` ships the `lance-cli` binary; `pipx install
+lance-cli` works the same way.
 
 ## From crates.io
 
 ```sh
-cargo install arrs-cli
+cargo install lance-cli
 ```
 
-The crate is named `arrs-cli`, the binary and the library are named `arrs`.
+The crate and the binary are named `lance-cli`; the library is `lance_cli`.
 
 ## From a clone
 
 ```sh
-git clone https://github.com/jonasdedden/arrs
-cd arrs
+git clone https://github.com/jonasdedden/lance-cli
+cd lance-cli
 cargo install --path .
 
 # Or run without installing:
@@ -34,21 +34,21 @@ The repository uses [`just`](https://github.com/casey/just) for common tasks:
 
 ## Shell completions
 
-`arrs completions <shell>` writes a completion script to stdout for `bash`,
+`lance-cli completions <shell>` writes a completion script to stdout for `bash`,
 `zsh`, `fish`, `powershell`, and `elvish`. Put it where your shell looks for
 completions:
 
 ```sh
 # bash
-arrs completions bash | sudo tee /etc/bash_completion.d/arrs > /dev/null
+lance-cli completions bash | sudo tee /etc/bash_completion.d/lance-cli > /dev/null
 
 # zsh — into a directory on $fpath, with `fpath+=(~/.zfunc)` before `compinit`
-arrs completions zsh > ~/.zfunc/_arrs
+lance-cli completions zsh > ~/.zfunc/_lance-cli
 
 # fish
-arrs completions fish > ~/.config/fish/completions/arrs.fish
+lance-cli completions fish > ~/.config/fish/completions/lance-cli.fish
 
 # PowerShell — write a file and dot-source it from your profile
-arrs completions powershell > $HOME\arrs.completion.ps1
-Add-Content $PROFILE '. $HOME\arrs.completion.ps1'
+lance-cli completions powershell > $HOME\lance-cli.completion.ps1
+Add-Content $PROFILE '. $HOME\lance-cli.completion.ps1'
 ```

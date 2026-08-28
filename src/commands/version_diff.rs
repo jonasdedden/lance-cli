@@ -1,18 +1,16 @@
-//! `arrs diff` — compare two versions of a single Lance dataset.
+//! `lance-cli diff DS --from <ref>` — compare two versions of one dataset.
 //!
 //! The whole comparison lives in this command layer rather than in
-//! `LanceCapabilities`: the two endpoints are opened as ordinary handles via
-//! the existing checkout path (`dataset::open` → `apply_checkout`), and the
-//! deltas are computed from primitives the trait already exposes
-//! (`arrow_schema`, `list_fragments`, `list_indices`, `list_versions`) plus one
-//! small orthogonal addition, `checkout_state`. This keeps the trait lean and
+//! [`crate::dataset`]: the two endpoints are opened as ordinary handles via the
+//! existing checkout path (`dataset::open` → `apply_checkout`), and the deltas
+//! are computed from primitives the dataset already exposes (`arrow_schema`,
+//! `list_fragments`, `list_indices`, `list_versions`, `checkout_state`). That
 //! makes every delta a pure function of already-collected data, so the
 //! comparison logic is unit-tested without touching a dataset.
 //!
-//! When the generic two-dataset `diff` (#13) lands it can reuse the same
-//! `DiffReport`, `build_*_delta` helpers and rendering (`write_human` /
-//! `to_json`) — only the endpoint-collection step (two versions of one dataset
-//! vs two different datasets) differs.
+//! The sibling dataset-vs-dataset mode (`commands::diff`) reuses this module's
+//! `SchemaDelta` machinery via `commands::diff_common`; only the
+//! endpoint-collection step differs.
 
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -21,7 +19,7 @@ use arrow_schema::SchemaRef;
 use serde_json::{Value, json};
 
 use crate::Result;
-use crate::cli::{Format, LanceArgs};
+use crate::cli::{Format, VersionArgs};
 use crate::commands::Outcome;
 use crate::commands::diff_common::{SchemaDelta, build_schema_delta};
 use crate::dataset::{self, FragmentInfo, IndexInfo, MAIN_BRANCH, VersionInfo};
@@ -55,21 +53,17 @@ pub async fn run(input: &str, sel: DiffSelectors, format: Option<Format>) -> Res
 
     // Open the "from" endpoint first so its resolved branch can seed the
     // default "to" endpoint (latest of the same branch).
-    let from_args = LanceArgs {
+    let from_args = VersionArgs {
         branch: sel.branch.clone(),
         version: sel.from_version,
         tag: sel.from_tag.clone(),
         as_of: None,
     };
     let from_ds = dataset::open(input, Some(&from_args)).await?;
-    let from_lance = from_ds.lance().ok_or_else(|| Error::NotLance {
-        command: "diff",
-        path: input.to_string(),
-    })?;
-    let from_state = from_lance.checkout_state();
+    let from_state = from_ds.checkout_state();
 
     let to_args = if sel.to_version.is_some() || sel.to_tag.is_some() {
-        LanceArgs {
+        VersionArgs {
             branch: sel.branch.clone(),
             version: sel.to_version,
             tag: sel.to_tag.clone(),
@@ -79,7 +73,7 @@ pub async fn run(input: &str, sel: DiffSelectors, format: Option<Format>) -> Res
         // Default: latest of the same branch as `from`. Map the implicit main
         // branch back to `None` so we never `checkout_branch("main")`.
         let branch = (from_state.branch != MAIN_BRANCH).then(|| from_state.branch.clone());
-        LanceArgs {
+        VersionArgs {
             branch,
             version: None,
             tag: None,
@@ -87,11 +81,7 @@ pub async fn run(input: &str, sel: DiffSelectors, format: Option<Format>) -> Res
         }
     };
     let to_ds = dataset::open(input, Some(&to_args)).await?;
-    let to_lance = to_ds.lance().ok_or_else(|| Error::NotLance {
-        command: "diff",
-        path: input.to_string(),
-    })?;
-    let to_state = to_lance.checkout_state();
+    let to_state = to_ds.checkout_state();
 
     // A diff is only meaningful within one branch's linear history. Tag/branch
     // mismatches on a single endpoint are already caught by `apply_checkout`;
@@ -108,21 +98,21 @@ pub async fn run(input: &str, sel: DiffSelectors, format: Option<Format>) -> Res
         branch: from_state.branch,
         version: from_state.version,
         schema: from_ds.arrow_schema(),
-        fragments: from_lance.list_fragments(false).await?,
-        indices: from_lance.list_indices().await?,
+        fragments: from_ds.list_fragments(false).await?,
+        indices: from_ds.list_indices().await?,
     };
     let to = Endpoint {
         branch: to_state.branch,
         version: to_state.version,
         schema: to_ds.arrow_schema(),
-        fragments: to_lance.list_fragments(false).await?,
-        indices: to_lance.list_indices().await?,
+        fragments: to_ds.list_fragments(false).await?,
+        indices: to_ds.list_indices().await?,
     };
 
     // Version log for the range (from, to]. `list_versions` returns the full
     // branch history regardless of either handle's checkout, so filter here.
     let (lo, hi) = (from.version.min(to.version), from.version.max(to.version));
-    let versions_in_range: Vec<VersionInfo> = to_lance
+    let versions_in_range: Vec<VersionInfo> = to_ds
         .list_versions(Some(&to.branch), false)
         .await?
         .into_iter()

@@ -3,7 +3,7 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "rust-arrs"
+name = "lance-cli"
 readme = "README.md"
 requires-python = ">=3.7"
 license = "MIT"
@@ -23,6 +23,6 @@ dynamic = ["version", "description"]
 
 [tool.maturin]
 bindings = "bin"
-module-name = "arrs"
+module-name = "lance-cli"
 strip = true
 manifest-path = "Cargo.toml"

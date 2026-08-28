@@ -9,7 +9,7 @@
 //! output — after the projected columns, `_rowid` first, then `_rowaddr`. This
 //! module owns that convention so every command (streaming scan and positional
 //! `take` alike) builds an identical output shape, and the writer header built
-//! by [`extend_schema`] matches the batches produced by the adapter.
+//! by [`extend_schema`] matches the batches produced by the scan.
 
 use std::sync::Arc;
 
@@ -99,7 +99,7 @@ pub fn validate_exclude(exclude: Option<&[String]>, flags: RowIds) -> Result<()>
 }
 
 /// Append the requested system fields to `schema`, producing the writer header
-/// that matches the batches the adapter emits: projected columns first, then
+/// that matches the batches the scan emits: projected columns first, then
 /// `_rowid`, then `_rowaddr`. Both are `UInt64` and nullable, mirroring Lance's
 /// `ROW_ID_FIELD` / `ROW_ADDR_FIELD`.
 pub fn extend_schema(schema: &SchemaRef, flags: RowIds) -> SchemaRef {

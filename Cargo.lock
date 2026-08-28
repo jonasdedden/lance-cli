@@ -383,36 +383,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arrs-cli"
-version = "0.2.1"
-dependencies = [
- "anyhow",
- "arrow",
- "arrow-array",
- "arrow-cast",
- "arrow-schema",
- "async-trait",
- "base64",
- "chrono",
- "clap",
- "clap_complete",
- "comfy-table",
- "csv",
- "futures",
- "glob",
- "indicatif",
- "lance",
- "lance-index",
- "lance-linalg",
- "rand 0.10.1",
- "rand_chacha 0.10.0",
- "serde_json",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
-]
-
-[[package]]
 name = "async-channel"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3512,6 +3482,35 @@ dependencies = [
  "arrayref",
  "paste",
  "seq-macro",
+]
+
+[[package]]
+name = "lance-cli"
+version = "0.2.1"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "arrow-array",
+ "arrow-cast",
+ "arrow-schema",
+ "base64",
+ "chrono",
+ "clap",
+ "clap_complete",
+ "comfy-table",
+ "csv",
+ "futures",
+ "glob",
+ "indicatif",
+ "lance",
+ "lance-index",
+ "lance-linalg",
+ "rand 0.10.1",
+ "rand_chacha 0.10.0",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
 ]
 
 [[package]]

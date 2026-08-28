@@ -6,7 +6,7 @@
 //! - A Lance blob-encoded column (`lance-encoding:blob` field metadata) whose
 //!   payload is read through the streaming blob API.
 //!
-//! Extraction is driven through the real `arrs` binary so the stdout/`-o`,
+//! Extraction is driven through the real `lance-cli` binary so the stdout/`-o`,
 //! TTY-guard and exit-code behaviour is covered exactly as a user sees it.
 //! (The tests run piped, so stdout is never a terminal and the guard's happy
 //! path is what executes; the guard predicate itself is unit-tested in
@@ -131,14 +131,14 @@ async fn write_large_blob_fixture(tmp: &TempDir, name: &str) -> PathBuf {
     path
 }
 
-/// Spawn the real binary: `arrs blob <args...> <path>`.
+/// Spawn the real binary: `lance-cli blob <args...> <path>`.
 fn run_blob(args: &[&str], path: &Path) -> Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_arrs"))
+    std::process::Command::new(env!("CARGO_BIN_EXE_lance-cli"))
         .arg("blob")
         .args(args)
         .arg(path)
         .output()
-        .expect("spawn arrs binary")
+        .expect("spawn lance-cli binary")
 }
 
 // ------------------------------ plain binary -------------------------------

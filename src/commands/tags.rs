@@ -7,17 +7,12 @@ use crate::Result;
 use crate::cli::Format;
 use crate::commands::common::make_stdout_writer;
 use crate::dataset;
-use crate::error::Error;
 use crate::output::RenderOptions;
 
 pub async fn run(input: &str, format: Format, render: RenderOptions) -> Result<()> {
     let ds = dataset::open(input, None).await?;
-    let lance = ds.lance().ok_or_else(|| Error::NotLance {
-        command: "tags",
-        path: input.to_string(),
-    })?;
 
-    let tags = lance.list_tags().await?;
+    let tags = ds.list_tags().await?;
 
     let schema = Arc::new(Schema::new(vec![
         Field::new("name", DataType::Utf8, false),

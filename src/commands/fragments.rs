@@ -4,27 +4,22 @@ use arrow_array::{Array, RecordBatch, StringArray, UInt64Array};
 use arrow_schema::{DataType, Field, Schema};
 
 use crate::Result;
-use crate::cli::{Format, LanceArgs};
+use crate::cli::{Format, VersionArgs};
 use crate::commands::common::{human_bytes, make_stdout_writer};
 use crate::dataset::{self, FragmentInfo};
-use crate::error::Error;
 use crate::output::RenderOptions;
 
 pub async fn run(
     input: &str,
-    lance: &LanceArgs,
+    version: &VersionArgs,
     verbose: bool,
     no_size: bool,
     format: Format,
     render: RenderOptions,
 ) -> Result<()> {
-    let ds = dataset::open(input, Some(lance)).await?;
-    let lance_caps = ds.lance().ok_or_else(|| Error::NotLance {
-        command: "fragments",
-        path: input.to_string(),
-    })?;
+    let ds = dataset::open(input, Some(version)).await?;
 
-    let fragments = lance_caps.list_fragments(!no_size).await?;
+    let fragments = ds.list_fragments(!no_size).await?;
 
     // `size` renders differently per format: a human-readable string in the
     // table (bytes are noise when eyeballing), raw bytes everywhere else so the

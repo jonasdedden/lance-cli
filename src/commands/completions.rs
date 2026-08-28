@@ -14,8 +14,8 @@ use clap_complete::{Shell, generate};
 use crate::cli::Cli;
 
 /// The program name completions are generated for. Matches `Cli`'s `command`
-/// name and the installed binary, so the generated script targets `arrs`.
-const BIN_NAME: &str = "arrs";
+/// name and the installed binary, so the generated script targets `lance-cli`.
+const BIN_NAME: &str = "lance-cli";
 
 /// Write the completion script for `shell` to `out`.
 ///

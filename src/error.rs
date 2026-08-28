@@ -117,17 +117,8 @@ pub enum Error {
     #[error("lance operation failed")]
     Lance(#[source] Box<dyn std::error::Error + Send + Sync>),
 
-    #[error("unrecognised dataset format at {path}")]
-    UnknownFormat { path: String },
-
-    #[error("--branch/--version/--tag/--as-of are only valid for Lance datasets ({path})")]
-    LanceFlagsOnNonLance { path: String },
-
-    #[error("'{command}' is only valid for Lance datasets ({path})")]
-    NotLance { command: &'static str, path: String },
-
-    #[error("--with-row-id/--with-row-addr are not supported by this format ({path})")]
-    RowIdUnsupported { path: String },
+    #[error("not a Lance dataset: {path} (expected a directory containing `_versions/`)")]
+    NotLanceDataset { path: String },
 
     #[error(
         "cannot exclude the system column '{column}' while {flag} is set; drop {flag} instead (the pseudo-column is only ever emitted because the flag requests it)"
@@ -167,7 +158,7 @@ pub enum Error {
     IpcRenderingFlag { flag: &'static str },
 
     #[error(
-        "refusing to write binary Arrow IPC to a terminal; redirect it to a file (arrs ... --format ipc > out.arrows) or pipe it to another program"
+        "refusing to write binary Arrow IPC to a terminal; redirect it to a file (lance-cli ... --format ipc > out.arrows) or pipe it to another program"
     )]
     IpcToTerminal,
 

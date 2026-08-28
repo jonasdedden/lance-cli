@@ -9,19 +9,19 @@
 
 use std::process::Command;
 
-use arrs::cli::{COMMAND_SECTIONS, Cli};
 use clap::CommandFactory;
+use lance_cli::cli::{COMMAND_SECTIONS, Cli};
 
-/// Run `arrs <args...> --help` and return stdout.
+/// Run `lance-cli <args...> --help` and return stdout.
 fn help(args: &[&str]) -> String {
-    let out = Command::new(env!("CARGO_BIN_EXE_arrs"))
+    let out = Command::new(env!("CARGO_BIN_EXE_lance-cli"))
         .args(args)
         .arg("--help")
         .output()
-        .expect("spawn arrs binary");
+        .expect("spawn lance-cli binary");
     assert!(
         out.status.success(),
-        "`arrs {} --help` exited non-zero",
+        "`lance-cli {} --help` exited non-zero",
         args.join(" ")
     );
     String::from_utf8(out.stdout).expect("help output is UTF-8")
@@ -78,11 +78,11 @@ fn assert_grouped(cmd: &str, secs: &[(String, Vec<String>)]) {
         "`{cmd}`: --no-progress not under `Output options` (got {output:?})"
     );
 
-    let lance = flags_under(secs, "Lance options")
-        .unwrap_or_else(|| panic!("`{cmd}` help missing `Lance options` heading"));
+    let version = flags_under(secs, "Version options")
+        .unwrap_or_else(|| panic!("`{cmd}` help missing `Version options` heading"));
     assert!(
-        lance.iter().any(|f| f == "--branch"),
-        "`{cmd}`: --branch not under `Lance options` (got {lance:?})"
+        version.iter().any(|f| f == "--branch"),
+        "`{cmd}`: --branch not under `Version options` (got {version:?})"
     );
 
     // No leakage: the format/selection flags must NOT also appear in the default
@@ -109,18 +109,14 @@ fn cat_help_groups_options_into_sections() {
     let secs = sections(&help(&["cat"]));
     assert_grouped("cat", &secs);
 
-    // cat flattens RowIdArgs, so the row-id pseudo-column flags are Lance-grouped.
-    let lance = flags_under(&secs, "Lance options").unwrap();
-    assert!(
-        lance.iter().any(|f| f == "--with-row-id"),
-        "cat: --with-row-id should be under `Lance options` (got {lance:?})"
-    );
-    // --where (from the flattened FilterArg) is a Selection flag.
+    // cat flattens RowIdArgs and FilterArg; both add Selection flags.
     let selection = flags_under(&secs, "Selection options").unwrap();
-    assert!(
-        selection.iter().any(|f| f == "--where"),
-        "cat: --where should be under `Selection options` (got {selection:?})"
-    );
+    for flag in ["--with-row-id", "--where"] {
+        assert!(
+            selection.iter().any(|f| f == flag),
+            "cat: {flag} should be under `Selection options` (got {selection:?})"
+        );
+    }
 }
 
 #[test]
@@ -167,23 +163,24 @@ fn commands_under(help_text: &str, heading: &str) -> Vec<String> {
 
 #[test]
 fn top_level_help_groups_subcommands_into_sections() {
-    let text = help(&[]); // `arrs --help`
-    let general = commands_under(&text, "Commands");
-    let lance = commands_under(&text, "Lance commands");
+    let text = help(&[]); // `lance-cli --help`
+    let data = commands_under(&text, "Commands");
+    let metadata = commands_under(&text, "Metadata commands");
     let setup = commands_under(&text, "Setup");
 
-    // Representative membership. `diff` and `blob` are format-agnostic (issue #50
-    // taxonomy) and must sit with the general commands, never with Lance.
-    for c in ["cat", "diff", "blob", "schema"] {
+    // Representative membership. The split is "reads rows" vs "reads the
+    // manifest only", so `search` sits with the data commands even though it is
+    // index-backed, and `stat` sits with the metadata ones.
+    for c in ["cat", "diff", "blob", "schema", "search"] {
         assert!(
-            general.contains(&c.to_string()),
-            "`{c}` should be a general command (got {general:?})"
+            data.contains(&c.to_string()),
+            "`{c}` should be a data command (got {data:?})"
         );
     }
-    for c in ["fragments", "search", "versions", "stat"] {
+    for c in ["fragments", "versions", "stat"] {
         assert!(
-            lance.contains(&c.to_string()),
-            "`{c}` should be a Lance command (got {lance:?})"
+            metadata.contains(&c.to_string()),
+            "`{c}` should be a metadata command (got {metadata:?})"
         );
     }
     assert!(
@@ -191,23 +188,23 @@ fn top_level_help_groups_subcommands_into_sections() {
         "`completions` should be under `Setup` (got {setup:?})"
     );
 
-    // No Lance command leaks into the general section.
-    for c in &lance {
+    // No metadata command leaks into the data section.
+    for c in &metadata {
         assert!(
-            !general.contains(c),
-            "Lance command `{c}` leaked into the general `Commands` section"
+            !data.contains(c),
+            "metadata command `{c}` leaked into the `Commands` section"
         );
     }
 
-    // Section order: format-agnostic first, Lance second, Setup last.
+    // Section order: data first, metadata second, Setup last.
     let at = |h: &str| text.find(&format!("{h}:")).unwrap_or(usize::MAX);
     assert!(
-        at("Commands") < at("Lance commands"),
-        "`Commands` must render before `Lance commands`"
+        at("Commands") < at("Metadata commands"),
+        "`Commands` must render before `Metadata commands`"
     );
     assert!(
-        at("Lance commands") < at("Setup"),
-        "`Lance commands` must render before `Setup`"
+        at("Metadata commands") < at("Setup"),
+        "`Metadata commands` must render before `Setup`"
     );
 }
 
@@ -245,24 +242,28 @@ fn every_subcommand_is_assigned_to_exactly_one_section() {
 
 #[test]
 fn help_subcommand_for_a_command_is_unaffected() {
-    // `arrs help cat` and `arrs cat --help` must still resolve to cat's own help,
+    // `lance-cli help cat` and `lance-cli cat --help` must still resolve to cat's own help,
     // unchanged by the top-level grouping (subcommands are only hidden from the
     // top-level command list, not from parsing).
     for args in [["help", "cat"], ["cat", "--help"]] {
-        let out = Command::new(env!("CARGO_BIN_EXE_arrs"))
+        let out = Command::new(env!("CARGO_BIN_EXE_lance-cli"))
             .args(args)
             .output()
-            .expect("spawn arrs binary");
-        assert!(out.status.success(), "`arrs {}` failed", args.join(" "));
+            .expect("spawn lance-cli binary");
+        assert!(
+            out.status.success(),
+            "`lance-cli {}` failed",
+            args.join(" ")
+        );
         let text = String::from_utf8(out.stdout).expect("help output is UTF-8");
         assert!(
             text.contains("Concatenate one or more datasets"),
-            "`arrs {}` missing cat's about line:\n{text}",
+            "`lance-cli {}` missing cat's about line:\n{text}",
             args.join(" ")
         );
         assert!(
-            text.contains("Usage: arrs cat"),
-            "`arrs {}` missing cat usage:\n{text}",
+            text.contains("Usage: lance-cli cat"),
+            "`lance-cli {}` missing cat usage:\n{text}",
             args.join(" ")
         );
     }

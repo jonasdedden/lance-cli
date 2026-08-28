@@ -12,18 +12,18 @@ use arrow_array::{
     StructArray,
 };
 use arrow_schema::{DataType, Field, Fields, Schema, SchemaRef};
-use arrs::cli::{BinaryFormat, Cli, Command, FilterArg, Format, LanceArgs, RowIdArgs};
-use arrs::commands::dispatch;
-use arrs::dataset;
-use arrs::dataset::ScanOptions;
-use arrs::indices;
-use arrs::output::make_writer;
-use arrs::output::table::TableStyle;
-use arrs::projection;
-use arrs::row_id::RowIds;
 use futures::StreamExt;
 use lance::Dataset as LanceInner;
 use lance::dataset::NewColumnTransform;
+use lance_cli::cli::{BinaryFormat, Cli, Command, FilterArg, Format, RowIdArgs, VersionArgs};
+use lance_cli::commands::dispatch;
+use lance_cli::dataset;
+use lance_cli::dataset::ScanOptions;
+use lance_cli::indices;
+use lance_cli::output::make_writer;
+use lance_cli::output::table::TableStyle;
+use lance_cli::projection;
+use lance_cli::row_id::RowIds;
 use lance_index::DatasetIndexExt as _;
 use lance_index::IndexType;
 use lance_index::scalar::ScalarIndexParams;
@@ -60,7 +60,7 @@ async fn collect_cat(
     binary_format: BinaryFormat,
     columns: Option<&[String]>,
     exclude: Option<&[String]>,
-) -> arrs::Result<String> {
+) -> lance_cli::Result<String> {
     let mut out: Vec<u8> = Vec::new();
     {
         let first = dataset::open(inputs[0].to_str().unwrap(), None).await?;
@@ -96,7 +96,7 @@ async fn collect_head(
     limit: u64,
     format: Format,
     binary_format: BinaryFormat,
-) -> arrs::Result<String> {
+) -> lance_cli::Result<String> {
     let ds = dataset::open(input.to_str().unwrap(), None).await?;
     let s = ds.arrow_schema();
     let projected = project(&s, None);
@@ -137,7 +137,7 @@ async fn collect_tail(
     limit: u64,
     format: Format,
     binary_format: BinaryFormat,
-) -> arrs::Result<String> {
+) -> lance_cli::Result<String> {
     let ds = dataset::open(input.to_str().unwrap(), None).await?;
     let s = ds.arrow_schema();
     let projected = project(&s, None);
@@ -168,7 +168,7 @@ async fn collect_take(
     idx: &str,
     format: Format,
     binary_format: BinaryFormat,
-) -> arrs::Result<String> {
+) -> lance_cli::Result<String> {
     let ds = dataset::open(input.to_str().unwrap(), None).await?;
     let s = ds.arrow_schema();
     let projected = project(&s, None);
@@ -199,7 +199,7 @@ async fn collect_take_cols(
     idx: &str,
     columns: Option<&[String]>,
     exclude: Option<&[String]>,
-) -> arrs::Result<String> {
+) -> lance_cli::Result<String> {
     let ds = dataset::open(input.to_str().unwrap(), None).await?;
     let s = ds.arrow_schema();
     let proj = projection::resolve(&s, columns, exclude)?;
@@ -232,7 +232,7 @@ async fn collect_sample(
     seed: u64,
     format: Format,
     binary_format: BinaryFormat,
-) -> arrs::Result<String> {
+) -> lance_cli::Result<String> {
     use rand::SeedableRng;
     use rand::prelude::*;
     use rand_chacha::ChaCha20Rng;
@@ -265,7 +265,7 @@ async fn collect_sample(
 
 /// Scan `input` with a `--where` filter and return every matching row as
 /// JSONL. Mirrors what `cat --where` / `head --where` (large limit) produce.
-async fn collect_scan_where(input: &str, filter: &str) -> arrs::Result<String> {
+async fn collect_scan_where(input: &str, filter: &str) -> lance_cli::Result<String> {
     let ds = dataset::open(input, None).await?;
     let s = ds.arrow_schema();
     let projected = project(&s, None);
@@ -415,7 +415,10 @@ fn take_out_of_range_errors() {
         let err = collect_take(&p, "100", Format::Jsonl, BinaryFormat::None)
             .await
             .unwrap_err();
-        assert!(matches!(err, arrs::error::Error::IndexOutOfRange { .. }));
+        assert!(matches!(
+            err,
+            lance_cli::error::Error::IndexOutOfRange { .. }
+        ));
     });
 }
 
@@ -508,7 +511,9 @@ fn jsonl_binary_none_placeholder_for_nested_binary() {
         let tmp = tempdir();
         let path = tmp.path().join("struct_bin");
         let iter = RecordBatchIterator::new(vec![Ok(batch)].into_iter(), schema);
-        arrs::lance::write_dataset(&path, iter).await.unwrap();
+        lance_cli::dataset::write_dataset(&path, iter)
+            .await
+            .unwrap();
 
         let out = collect_cat(vec![path], Format::Jsonl, BinaryFormat::None, None, None)
             .await
@@ -665,7 +670,7 @@ fn unknown_column_errors() {
         )
         .await
         .unwrap_err();
-        assert!(matches!(err, arrs::error::Error::UnknownColumn { .. }));
+        assert!(matches!(err, lance_cli::error::Error::UnknownColumn { .. }));
     });
 }
 
@@ -737,7 +742,7 @@ fn glob_no_match_errors_through_cat() {
         )
         .await
         .unwrap_err();
-        assert!(matches!(err, arrs::error::Error::NoGlobMatch { .. }));
+        assert!(matches!(err, lance_cli::error::Error::NoGlobMatch { .. }));
     });
 }
 
@@ -910,7 +915,10 @@ fn nested_invalid_field_errors_through_cat() {
         )
         .await
         .unwrap_err();
-        assert!(matches!(err, arrs::error::Error::UnknownNestedField { .. }));
+        assert!(matches!(
+            err,
+            lance_cli::error::Error::UnknownNestedField { .. }
+        ));
     });
 }
 
@@ -928,7 +936,10 @@ fn nested_non_struct_traversal_errors_through_cat() {
         )
         .await
         .unwrap_err();
-        assert!(matches!(err, arrs::error::Error::NonStructField { .. }));
+        assert!(matches!(
+            err,
+            lance_cli::error::Error::NonStructField { .. }
+        ));
     });
 }
 
@@ -1055,14 +1066,14 @@ fn format_on_schema_errors() {
             no_progress: false,
             command: Command::Schema {
                 input: "does-not-matter".to_string(),
-                ty: arrs::cli::SchemaType::Arrow,
-                lance: arrs::cli::LanceArgs::default(),
+                ty: lance_cli::cli::SchemaType::Arrow,
+                version: lance_cli::cli::VersionArgs::default(),
             },
         };
         let res = dispatch(cli).await;
         assert!(matches!(
             res,
-            Err(arrs::error::Error::FormatNotApplicable { command: "schema" })
+            Err(lance_cli::error::Error::FormatNotApplicable { command: "schema" })
         ));
     });
 }
@@ -1082,13 +1093,13 @@ fn format_on_rowcount_errors() {
             command: Command::Rowcount {
                 input: "does-not-matter".to_string(),
                 filter: FilterArg::default(),
-                lance: arrs::cli::LanceArgs::default(),
+                version: lance_cli::cli::VersionArgs::default(),
             },
         };
         let res = dispatch(cli).await;
         assert!(matches!(
             res,
-            Err(arrs::error::Error::FormatNotApplicable {
+            Err(lance_cli::error::Error::FormatNotApplicable {
                 command: "rowcount"
             })
         ));
@@ -1111,11 +1122,11 @@ fn empty_cat_via_dispatch_errors() {
                 inputs: vec![],
                 filter: FilterArg::default(),
                 row_ids: RowIdArgs::default(),
-                lance: arrs::cli::LanceArgs::default(),
+                version: lance_cli::cli::VersionArgs::default(),
             },
         };
         let res = dispatch(cli).await;
-        assert!(matches!(res, Err(arrs::error::Error::EmptyInputs)));
+        assert!(matches!(res, Err(lance_cli::error::Error::EmptyInputs)));
     });
 }
 
@@ -1132,7 +1143,9 @@ fn csv_quotes_column_name_containing_comma() {
         let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(Int32Array::from(vec![1]))])
             .unwrap();
         let iter = RecordBatchIterator::new(vec![Ok(batch)].into_iter(), schema);
-        arrs::lance::write_dataset(&path, iter).await.unwrap();
+        lance_cli::dataset::write_dataset(&path, iter)
+            .await
+            .unwrap();
         let out = collect_cat(vec![path], Format::Csv, BinaryFormat::None, None, None)
             .await
             .unwrap();
@@ -1222,7 +1235,7 @@ fn invalid_where_predicate_on_scan_errors() {
         // `scan` yields a non-Debug `BatchStream` on success, so match rather
         // than `unwrap_err`.
         match ds.scan(&options).await {
-            Err(arrs::error::Error::InvalidPredicate(_)) => {}
+            Err(lance_cli::error::Error::InvalidPredicate(_)) => {}
             other => panic!("expected InvalidPredicate, got {:?}", other.map(|_| ())),
         }
     });
@@ -1238,7 +1251,7 @@ fn invalid_where_predicate_on_rowcount_errors() {
             .count_rows(Some("this is not sql ((("))
             .await
             .unwrap_err();
-        assert!(matches!(err, arrs::error::Error::InvalidPredicate(_)));
+        assert!(matches!(err, lance_cli::error::Error::InvalidPredicate(_)));
     });
 }
 
@@ -1261,11 +1274,14 @@ fn take_with_where_is_rejected() {
                     predicate: Some("id > 1".to_string()),
                 },
                 row_ids: RowIdArgs::default(),
-                lance: LanceArgs::default(),
+                version: VersionArgs::default(),
             },
         };
         let res = dispatch(cli).await;
-        assert!(matches!(res, Err(arrs::error::Error::TakeWhereConflict)));
+        assert!(matches!(
+            res,
+            Err(lance_cli::error::Error::TakeWhereConflict)
+        ));
     });
 }
 
@@ -1281,11 +1297,11 @@ fn take_with_where_is_rejected() {
 // leaking before a failed `count_rows` / predicate parse.
 
 fn run_cli(args: &[&str], path: &Path) -> std::process::Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_arrs"))
+    std::process::Command::new(env!("CARGO_BIN_EXE_lance-cli"))
         .args(args)
         .arg(path)
         .output()
-        .expect("spawn arrs binary")
+        .expect("spawn lance-cli binary")
 }
 
 fn assert_clean_failure(out: &std::process::Output, stderr_needle: &str) {
@@ -1371,7 +1387,7 @@ fn sample_oversize_writes_nothing_to_stdout() {
 #[test]
 fn search_rejects_k_zero() {
     let res = <Cli as clap::Parser>::try_parse_from([
-        "arrs",
+        "lance-cli",
         "search",
         "--column",
         "embedding",
@@ -1388,7 +1404,7 @@ fn search_rejects_k_zero() {
 #[test]
 fn search_accepts_positive_k() {
     let res = <Cli as clap::Parser>::try_parse_from([
-        "arrs",
+        "lance-cli",
         "search",
         "--column",
         "embedding",
@@ -1406,7 +1422,7 @@ fn search_accepts_positive_k() {
 #[test]
 fn search_rejects_nprobes_zero() {
     let res = <Cli as clap::Parser>::try_parse_from([
-        "arrs",
+        "lance-cli",
         "search",
         "--column",
         "embedding",
@@ -1423,7 +1439,7 @@ fn search_rejects_nprobes_zero() {
 #[test]
 fn search_requires_a_query_vector() {
     let res = <Cli as clap::Parser>::try_parse_from([
-        "arrs",
+        "lance-cli",
         "search",
         "--column",
         "embedding",
@@ -1439,7 +1455,7 @@ fn search_requires_a_query_vector() {
 #[test]
 fn as_of_conflicts_with_version() {
     let res = <Cli as clap::Parser>::try_parse_from([
-        "arrs",
+        "lance-cli",
         "head",
         "--as-of",
         "2026-07-01T12:00:00Z",
@@ -1454,7 +1470,7 @@ fn as_of_conflicts_with_version() {
 #[test]
 fn as_of_conflicts_with_tag() {
     let res = <Cli as clap::Parser>::try_parse_from([
-        "arrs",
+        "lance-cli",
         "head",
         "--as-of",
         "2026-07-01",
@@ -1469,7 +1485,7 @@ fn as_of_conflicts_with_tag() {
 #[test]
 fn as_of_combines_with_branch() {
     let res = <Cli as clap::Parser>::try_parse_from([
-        "arrs",
+        "lance-cli",
         "head",
         "--as-of",
         "2026-07-01T12:00:00Z",
@@ -1616,7 +1632,7 @@ fn build_diff_fixture(path: &Path) -> Runtime {
     rt
 }
 
-/// Run `arrs diff <args> <path>` and return the process output.
+/// Run `lance-cli diff <args> <path>` and return the process output.
 fn run_diff(args: &[&str], path: &Path) -> std::process::Output {
     let mut full = vec!["diff"];
     full.extend_from_slice(args);
@@ -1933,13 +1949,13 @@ fn diff_tag_on_wrong_branch_errors_with_exit_two() {
 
 // -------------------- diff dataset-vs-dataset (issue #13) --------------------
 
-/// Run `arrs <args>` with no implicit trailing dataset path (the two-positional
+/// Run `lance-cli <args>` with no implicit trailing dataset path (the two-positional
 /// dataset-vs-dataset diff needs full control over the argument vector).
 fn run_bin(args: &[&str]) -> std::process::Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_arrs"))
+    std::process::Command::new(env!("CARGO_BIN_EXE_lance-cli"))
         .args(args)
         .output()
-        .expect("spawn arrs binary")
+        .expect("spawn lance-cli binary")
 }
 
 /// Write a single-batch Lance dataset under `dir`, returning its path as a
@@ -1984,7 +2000,7 @@ fn write_nested(dir: &Path, name: &str, id_i64: bool) -> String {
     write_batch_dataset(dir, name, batch)
 }
 
-/// Run `arrs diff A B <extra…> --format jsonl`, assert the exit code, and parse.
+/// Run `lance-cli diff A B <extra…> --format jsonl`, assert the exit code, and parse.
 fn dsdiff_json(a: &str, b: &str, extra: &[&str], expect_code: i32) -> serde_json::Value {
     let mut args = vec!["diff", a, b];
     args.extend_from_slice(extra);
@@ -2228,7 +2244,7 @@ fn dsdiff_unsupported_format_exit_two() {
 fn diff_single_dataset_without_selector_errors() {
     let tmp = tempdir();
     let a = write_idval(tmp.path(), "a.lance", vec![1, 2, 3], vec!["x", "y", "z"]);
-    // One dataset, no --from/--from-tag: arrs can't tell which comparison.
+    // One dataset, no --from/--from-tag: lance-cli can't tell which comparison.
     let out = run_bin(&["diff", &a]);
     assert_eq!(out.status.code(), Some(2));
     let stderr = String::from_utf8_lossy(&out.stderr);
@@ -2241,7 +2257,7 @@ fn diff_single_dataset_without_selector_errors() {
 // -------------------- --with-row-id / --with-row-addr (#21) --------------------
 //
 // These drive the real binary end-to-end (parsing jsonl stdout) so they exercise
-// clap parsing, the projection interaction, and the adapter's scan/take paths.
+// clap parsing, the projection interaction, and the dataset's scan/take paths.
 
 /// Parse a successful command's jsonl stdout into one JSON object per row. The
 /// `preserve_order` serde_json feature keeps object keys in column order, so the

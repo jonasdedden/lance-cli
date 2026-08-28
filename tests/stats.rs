@@ -1,4 +1,4 @@
-//! Integration tests for the `stats` command engine (`arrs::stats`).
+//! Integration tests for the `stats` command engine (`lance_cli::stats`).
 //!
 //! Each test writes a real Lance dataset, then folds it through
 //! `stats::compute` and asserts on known expected statistics. Rendering to the
@@ -15,12 +15,12 @@ use lance::Dataset as LanceInner;
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
 
-use arrs::cli::{BinaryFormat, Format};
-use arrs::commands::progress::ScanProgress;
-use arrs::dataset::{self, ColumnStats};
-use arrs::output::make_writer;
-use arrs::output::table::TableStyle;
-use arrs::stats;
+use lance_cli::cli::{BinaryFormat, Format};
+use lance_cli::commands::progress::ScanProgress;
+use lance_cli::dataset::{self, ColumnStats};
+use lance_cli::output::make_writer;
+use lance_cli::output::table::TableStyle;
+use lance_cli::stats;
 
 use common::{tempdir, write_full};
 
@@ -345,7 +345,7 @@ fn projection_and_filter_respected() {
         let err = stats::compute(ds.as_ref(), &ScanProgress::disabled(), Some(&bogus), None)
             .await
             .unwrap_err();
-        assert!(matches!(err, arrs::error::Error::UnknownColumn { .. }));
+        assert!(matches!(err, lance_cli::error::Error::UnknownColumn { .. }));
 
         // Filter: id > 2 keeps rows (3, 4, 5) → score values {30, null, 40}.
         let stats = stats::compute(ds.as_ref(), &ScanProgress::disabled(), None, Some("id > 2"))

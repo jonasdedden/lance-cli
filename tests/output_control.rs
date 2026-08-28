@@ -13,9 +13,9 @@ use arrow_array::{
     FixedSizeListArray, Float32Array, Float64Array, Int32Array, RecordBatch, StringArray,
 };
 use arrow_schema::{DataType, Field, Schema, SchemaRef};
-use arrs::cli::Format;
-use arrs::output::table::TableStyle;
-use arrs::output::{RenderOptions, make_writer};
+use lance_cli::cli::Format;
+use lance_cli::output::table::TableStyle;
+use lance_cli::output::{RenderOptions, make_writer};
 use serde_json::Value;
 
 // ---------- fixtures ----------

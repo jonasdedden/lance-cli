@@ -17,8 +17,8 @@ pub enum Format {
     /// fully streaming at constant memory. Only valid on the row-producing
     /// commands (`cat`/`head`/`tail`/`take`/`sample`); the value-rendering flags
     /// (`--binary-format`, `--max-list-items`, `--max-cell-width`,
-    /// `--float-precision`) do not apply to it and are rejected. arrs refuses to
-    /// write it to a terminal — redirect or pipe it.
+    /// `--float-precision`) do not apply to it and are rejected. lance-cli
+    /// refuses to write it to a terminal — redirect or pipe it.
     Ipc,
 }
 
@@ -46,28 +46,28 @@ pub enum FreqSort {
 pub enum SchemaType {
     /// Logical arrow schema.
     Arrow,
-    /// Physical (format-native) schema.
+    /// Physical (Lance-native) schema.
     Physical,
 }
 
-/// Lance-specific selectors for which version of a dataset to read.
+/// Selectors for which version of a dataset to read.
 ///
 /// `--branch` is independent and can be combined with any of `--version`,
 /// `--tag`, or `--as-of`. `--version`, `--tag`, and `--as-of` all name a
 /// single version and are therefore mutually exclusive. With no flags set,
 /// the latest version of `main` is used.
 #[derive(Debug, Clone, Args, Default)]
-#[command(next_help_heading = "Lance options")]
-pub struct LanceArgs {
-    /// Read from the named Lance branch (default: main).
+#[command(next_help_heading = "Version options")]
+pub struct VersionArgs {
+    /// Read from the named branch (default: main).
     #[arg(long)]
     pub branch: Option<String>,
 
-    /// Read from a specific Lance version on the chosen branch.
+    /// Read from a specific version on the chosen branch.
     #[arg(long, conflicts_with = "tag")]
     pub version: Option<u64>,
 
-    /// Read from a specific Lance tag on the chosen branch.
+    /// Read from a specific tag on the chosen branch.
     #[arg(long, conflicts_with = "version")]
     pub tag: Option<String>,
 
@@ -78,16 +78,6 @@ pub struct LanceArgs {
     /// (`2026-07-01`).
     #[arg(long = "as-of", conflicts_with_all = ["version", "tag"])]
     pub as_of: Option<String>,
-}
-
-impl LanceArgs {
-    /// True when at least one Lance-specific selector was supplied.
-    pub fn is_any_set(&self) -> bool {
-        self.branch.is_some()
-            || self.version.is_some()
-            || self.tag.is_some()
-            || self.as_of.is_some()
-    }
 }
 
 /// SQL-style row predicate shared by every row-producing command (and
@@ -104,14 +94,12 @@ pub struct FilterArg {
 }
 
 /// The `--with-row-id` / `--with-row-addr` pseudo-column flags, shared by the
-/// row-producing commands (`cat`/`head`/`tail`/`take`/`sample`). Lance-only; a
-/// clear "not supported by this format" error is raised on any other backend.
-/// Kept as its own flattened `Args` group so the flag definitions live in one
-/// place.
+/// row-producing commands (`cat`/`head`/`tail`/`take`/`sample`). Kept as its own
+/// flattened `Args` group so the flag definitions live in one place.
 #[derive(Debug, Clone, Args, Default)]
-#[command(next_help_heading = "Lance options")]
+#[command(next_help_heading = "Selection options")]
 pub struct RowIdArgs {
-    /// (Lance only) Append a `_rowid` column: the per-row identity. Stable
+    /// Append a `_rowid` column: the per-row identity. Stable
     /// across deletions; stable across compaction only for datasets written with
     /// Lance's stable row ids enabled (off by default, in which case `_rowid` is
     /// address-based and is rewritten by compaction). Always emitted regardless
@@ -119,7 +107,7 @@ pub struct RowIdArgs {
     #[arg(long = "with-row-id")]
     pub with_row_id: bool,
 
-    /// (Lance only) Append a `_rowaddr` column: the physical address of the row
+    /// Append a `_rowaddr` column: the physical address of the row
     /// (`fragment_id << 32 | offset`) in the current version. Always emitted
     /// regardless of --columns/--exclude-columns.
     #[arg(long = "with-row-addr")]
@@ -128,7 +116,7 @@ pub struct RowIdArgs {
 
 impl RowIdArgs {
     /// Convert the parsed flags into the [`crate::row_id::RowIds`] threaded
-    /// through `ScanOptions` and `Dataset::take`.
+    /// through `ScanOptions` and `LanceDataset::take`.
     pub fn flags(&self) -> crate::row_id::RowIds {
         crate::row_id::RowIds {
             with_row_id: self.with_row_id,
@@ -138,18 +126,18 @@ impl RowIdArgs {
 }
 
 #[derive(Debug, Parser)]
-#[command(name = "arrs", about = "Inspect Arrow-based datasets.", version)]
+#[command(name = "lance-cli", about = "Inspect Lance datasets.", version)]
 pub struct Cli {
     // Global flags are grouped into `--help` sections via per-arg `help_heading`
-    // (see also the `next_help_heading` on the flattened LanceArgs/RowIdArgs/
+    // (see also the `next_help_heading` on the flattened VersionArgs/RowIdArgs/
     // FilterArg structs). clap derives help-section *ordering* from the order in
     // which each heading is first encountered while registering arguments, and it
     // offers no API to reorder sections. Because a subcommand's own args
-    // (positionals, command-specific flags, and the flattened Lance/Selection
-    // structs) register before these propagated globals, the Lance section always
-    // renders at its flatten site. To keep the relative order of these globals
-    // stable and sensible, Selection is declared before Output here, and every
-    // Output flag is kept contiguous.
+    // (positionals, command-specific flags, and the flattened Version/Selection
+    // structs) register before these propagated globals, the Version section
+    // always renders at its flatten site. To keep the relative order of these
+    // globals stable and sensible, Selection is declared before Output here, and
+    // every Output flag is kept contiguous.
     /// Comma-separated list of columns to include.
     #[arg(
         long,
@@ -169,8 +157,9 @@ pub struct Cli {
     pub exclude_columns: Option<Vec<String>>,
 
     /// Output format for row-producing commands. When unset, metadata commands
-    /// (versions/branches/tags/indices/fragments) default to `table` (fully buffered to enable
-    /// column alignment); everything else to `jsonl` (streaming).
+    /// (versions/branches/tags/indices/fragments) default to `table` (fully
+    /// buffered to enable column alignment); everything else to `jsonl`
+    /// (streaming).
     #[arg(long, global = true, value_enum, help_heading = "Output options")]
     pub format: Option<Format>,
 
@@ -237,7 +226,7 @@ pub enum Command {
         #[command(flatten)]
         row_ids: RowIdArgs,
         #[command(flatten)]
-        lance: LanceArgs,
+        version: VersionArgs,
     },
 
     /// Print the first N rows.
@@ -250,7 +239,7 @@ pub enum Command {
         #[command(flatten)]
         row_ids: RowIdArgs,
         #[command(flatten)]
-        lance: LanceArgs,
+        version: VersionArgs,
     },
 
     /// Print the last N rows.
@@ -263,7 +252,7 @@ pub enum Command {
         #[command(flatten)]
         row_ids: RowIdArgs,
         #[command(flatten)]
-        lance: LanceArgs,
+        version: VersionArgs,
     },
 
     /// Print rows at the given indices (comma-separated; supports `a:b`, `a:`, `:b`, negatives).
@@ -276,7 +265,7 @@ pub enum Command {
         #[command(flatten)]
         row_ids: RowIdArgs,
         #[command(flatten)]
-        lance: LanceArgs,
+        version: VersionArgs,
     },
 
     /// Extract one cell's binary/blob payload to a file or stdout.
@@ -303,7 +292,7 @@ pub enum Command {
         #[arg(short = 'o', long, value_name = "FILE")]
         output: Option<PathBuf>,
         #[command(flatten)]
-        lance: LanceArgs,
+        version: VersionArgs,
     },
 
     /// Print the number of rows.
@@ -312,7 +301,7 @@ pub enum Command {
         #[command(flatten)]
         filter: FilterArg,
         #[command(flatten)]
-        lance: LanceArgs,
+        version: VersionArgs,
     },
 
     /// Randomly sample N rows without replacement.
@@ -328,7 +317,7 @@ pub enum Command {
         #[command(flatten)]
         row_ids: RowIdArgs,
         #[command(flatten)]
-        lance: LanceArgs,
+        version: VersionArgs,
     },
 
     /// Per-column summary statistics, one row per column (like `df.describe()`).
@@ -343,7 +332,7 @@ pub enum Command {
         #[command(flatten)]
         filter: FilterArg,
         #[command(flatten)]
-        lance: LanceArgs,
+        version: VersionArgs,
     },
 
     /// Count occurrences of each distinct value in a column (value counts).
@@ -363,10 +352,10 @@ pub enum Command {
         #[command(flatten)]
         filter: FilterArg,
         #[command(flatten)]
-        lance: LanceArgs,
+        version: VersionArgs,
     },
 
-    /// (Lance only) One-screen dataset health summary — the `stat(1)` of datasets.
+    /// One-screen dataset health summary — the `stat(1)` of datasets.
     ///
     /// Metadata-only (no data scan): rows, deleted rows + ratio, columns,
     /// fragment row-count spread, on-disk size, and version/branch/tag/index
@@ -379,7 +368,7 @@ pub enum Command {
         #[arg(long = "no-size")]
         no_size: bool,
         #[command(flatten)]
-        lance: LanceArgs,
+        version: VersionArgs,
     },
 
     /// Print the schema of the dataset.
@@ -389,10 +378,10 @@ pub enum Command {
         #[arg(long = "type", value_enum, default_value_t = SchemaType::Arrow)]
         ty: SchemaType,
         #[command(flatten)]
-        lance: LanceArgs,
+        version: VersionArgs,
     },
 
-    /// (Lance only) Print versions of the dataset.
+    /// Print versions of the dataset.
     Versions {
         input: String,
         /// Scope to a specific branch (default: main).
@@ -403,20 +392,20 @@ pub enum Command {
         tagged_only: bool,
     },
 
-    /// (Lance only) Print branches available for the dataset.
+    /// Print branches available for the dataset.
     Branches { input: String },
 
-    /// (Lance only) Print tags defined on the dataset, across all branches.
+    /// Print tags defined on the dataset, across all branches.
     Tags { input: String },
 
-    /// (Lance only) Print indices defined on the dataset.
+    /// Print indices defined on the dataset.
     Indices {
         input: String,
         #[command(flatten)]
-        lance: LanceArgs,
+        version: VersionArgs,
     },
 
-    /// (Lance only) List fragments with row, deletion, file, and size info.
+    /// List fragments with row, deletion, file, and size info.
     Fragments {
         input: String,
         /// Show each fragment's data file paths in table output (they are
@@ -428,21 +417,21 @@ pub enum Command {
         #[arg(long = "no-size")]
         no_size: bool,
         #[command(flatten)]
-        lance: LanceArgs,
+        version: VersionArgs,
     },
 
-    /// Diff two datasets, or two versions of one Lance dataset.
+    /// Diff two datasets, or two versions of one dataset.
     ///
     /// One verb, two modes, chosen by how many datasets you name:
     ///
-    /// * DATASET-VS-DATASET (`arrs diff A B`): compares two different datasets
-    ///   (any backend) by schema, schema-metadata and row count. Being
-    ///   backend-generic, it takes no Lance version selectors; passing
-    ///   --from/--to/--from-tag/--to-tag/--branch alongside a second dataset is
-    ///   an error.
+    /// * DATASET-VS-DATASET (`lance-cli diff A B`): compares two different
+    ///   datasets by schema, schema-metadata and row count. Version selectors
+    ///   name a version of *one* dataset and are therefore rejected here:
+    ///   passing --from/--to/--from-tag/--to-tag/--branch alongside a second
+    ///   dataset is an error.
     ///
-    /// * VERSION (`arrs diff DS --from <ref>`): compares two versions of one
-    ///   Lance dataset (row, schema, fragment, index and version-log deltas).
+    /// * VERSION (`lance-cli diff DS --from <ref>`): compares two versions of
+    ///   one dataset (row, schema, fragment, index and version-log deltas).
     ///   Selected by giving a single dataset plus at least one of --from or
     ///   --from-tag.
     ///
@@ -458,7 +447,7 @@ pub enum Command {
         /// versions.
         input: String,
         /// Second dataset. Its presence selects dataset-vs-dataset mode, in
-        /// which Lance version selectors are rejected.
+        /// which the version selectors are rejected.
         other: Option<String>,
         /// (Version mode) Left-hand ("from") version number.
         #[arg(long, conflicts_with = "from_tag")]
@@ -479,7 +468,7 @@ pub enum Command {
         branch: Option<String>,
     },
 
-    /// (Lance only) Nearest-neighbor vector search; appends a `_distance` column.
+    /// Nearest-neighbor vector search; appends a `_distance` column.
     ///
     /// Uses an ANN index on the column when present, otherwise falls back to
     /// flat (brute-force) KNN and prints a note to stderr. The output honours
@@ -507,21 +496,21 @@ pub enum Command {
         #[arg(long = "refine-factor")]
         refine_factor: Option<u32>,
         #[command(flatten)]
-        lance: LanceArgs,
+        version: VersionArgs,
     },
 
-    /// (Lance only) Print per-index coverage: indexed vs unindexed row counts.
+    /// Print per-index coverage: indexed vs unindexed row counts.
     IndexStats {
         input: String,
         #[command(flatten)]
-        lance: LanceArgs,
+        version: VersionArgs,
     },
 
-    /// (Setup) Generate a shell completion script and print it to stdout.
+    /// Generate a shell completion script and print it to stdout.
     ///
     /// Takes no dataset input; writes the script for the given shell and exits.
     /// See the README install section for where to install each shell's script,
-    /// e.g. `arrs completions fish > ~/.config/fish/completions/arrs.fish`.
+    /// e.g. `lance-cli completions fish > ~/.config/fish/completions/lance-cli.fish`.
     Completions {
         /// Shell to generate completions for (bash, zsh, fish, powershell, elvish).
         #[arg(value_enum)]
@@ -529,7 +518,7 @@ pub enum Command {
     },
 }
 
-// ── Subcommand grouping in `arrs --help` (issue #50) ─────────────────────────
+// ── Subcommand grouping in `lance-cli --help` (issue #50) ────────────────────
 //
 // Follow-up to #47's option grouping. clap 4.6 renders *every* subcommand in a
 // single flat "Commands:" block (`HelpTemplate::write_subcommands`); there is no
@@ -546,21 +535,21 @@ pub enum Command {
 //       under one "Commands:" heading, so it fails the "≥2 clearly-headed
 //       sections" bar on its own.
 //   (c) Hide the real subcommands and hand-render the whole grouped command list.
-//       CHOSEN. `hide = true` is display-only: parsing, `arrs <cmd> --help`, and
-//       `arrs help <cmd>` are all unaffected. With every subcommand hidden,
+//       CHOSEN. `hide = true` is display-only: parsing, `lance-cli <cmd> --help`,
+//       and `lance-cli help <cmd>` are all unaffected. With every subcommand hidden,
 //       clap's automatic "Commands:" block is suppressed (`has_visible_
 //       subcommands()` → false) while the flattened #47 option groups still
 //       render via `{all-args}`. We splice a pre-rendered, grouped, headed
 //       command list into the template ahead of `{all-args}`.
 //
 // COMPLETIONS SAFETY (the #14 hazard): `hide = true` drops a subcommand from
-// `clap_complete` output and from `arrs help` discoverability. We avoid that by
+// `clap_complete` output and from `lance-cli help` discoverability. We avoid that by
 // never hiding on the derive: the completion generator builds its own pristine
 // `Cli::command()` (see `commands/completions.rs`), and the hiding here is
 // applied only to the throwaway command used for parsing/help in
 // `command_grouped`. So all commands stay in every shell's completions — the
-// `polish.rs` suite asserts a Lance command (`fragments`) is present — and
-// `arrs help <cmd>` / `arrs <cmd> --help` keep working. Trade-off: the grouped
+// `polish.rs` suite asserts a metadata command (`fragments`) is present — and
+// `lance-cli help <cmd>` / `lance-cli <cmd> --help` keep working. Trade-off: the grouped
 // list is plain text, so command names/headings are not ANSI-styled the way
 // clap's own block is (immaterial when piped, which is how it is tested).
 //
@@ -569,17 +558,16 @@ pub enum Command {
 // fails if any subcommand is unassigned or assigned twice — the sections cannot
 // silently rot when a new command is added.
 
-/// Format-agnostic subcommands: they operate on any supported backend, so they
-/// carry no "(Lance)" annotation in the README command table. `diff` lives here
-/// (its dataset-vs-dataset mode is primary; the Lance version mode is documented
-/// in `diff`'s own help) and so does `blob` (it reads plain binary columns
-/// generically). Declaration order is the render order under "Commands:".
-pub const GENERAL_COMMANDS: &[&str] = &[
-    "cat", "head", "tail", "take", "sample", "rowcount", "stats", "freq", "schema", "diff", "blob",
+/// Subcommands that read the dataset's rows. Declaration order is the render
+/// order under "Commands:".
+pub const DATA_COMMANDS: &[&str] = &[
+    "cat", "head", "tail", "take", "sample", "search", "rowcount", "stats", "freq", "schema",
+    "diff", "blob",
 ];
 
-/// Lance-specific subcommands — the README "(Lance)" rows.
-pub const LANCE_COMMANDS: &[&str] = &[
+/// Subcommands that answer from the manifest alone, without reading row data —
+/// the dataset's catalog: its versions, tags, indices and physical layout.
+pub const METADATA_COMMANDS: &[&str] = &[
     "stat",
     "versions",
     "branches",
@@ -587,7 +575,6 @@ pub const LANCE_COMMANDS: &[&str] = &[
     "indices",
     "index-stats",
     "fragments",
-    "search",
 ];
 
 /// Setup / tooling subcommands, including clap's auto-generated `help`.
@@ -595,8 +582,8 @@ pub const SETUP_COMMANDS: &[&str] = &["completions", "help"];
 
 /// The `--help` command sections in render order: `(heading, member names)`.
 pub const COMMAND_SECTIONS: &[(&str, &[&str])] = &[
-    ("Commands", GENERAL_COMMANDS),
-    ("Lance commands", LANCE_COMMANDS),
+    ("Commands", DATA_COMMANDS),
+    ("Metadata commands", METADATA_COMMANDS),
     ("Setup", SETUP_COMMANDS),
 ];
 
@@ -633,7 +620,7 @@ impl Cli {
         // `override_usage` (a command is still required — hiding does not change
         // parsing).
         cmd.mut_subcommands(|sc| sc.hide(true))
-            .override_usage("arrs [OPTIONS] <COMMAND>")
+            .override_usage("lance-cli [OPTIONS] <COMMAND>")
             .help_template(grouped_help_template(&sections))
     }
 }

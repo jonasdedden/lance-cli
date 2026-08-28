@@ -8,7 +8,7 @@
 //!   pattern occupies in the user's list.
 //! * **Nested field paths** (`meta.user.id`) that walk into struct columns.
 //!   Paths are validated against the Arrow schema so a bad path yields a clear
-//!   error instead of a backend panic.
+//!   error instead of a panic deep inside Lance.
 //!
 //! **Ambiguity / escaping rule:** a token that *exactly* matches a real
 //! top-level column name is always treated as that literal column — this is how

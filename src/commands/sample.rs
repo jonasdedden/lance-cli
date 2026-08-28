@@ -5,10 +5,10 @@ use rand::prelude::*;
 use rand_chacha::ChaCha20Rng;
 
 use crate::Result;
-use crate::cli::{Format, LanceArgs};
+use crate::cli::{Format, VersionArgs};
 use crate::commands::common::{make_stdout_writer, prepare_row_id_columns, project_arrow_schema};
 use crate::commands::progress::ScanProgress;
-use crate::dataset::{self, Dataset, ScanOptions};
+use crate::dataset::{self, LanceDataset, ScanOptions};
 use crate::error::Error;
 use crate::output::RenderOptions;
 use crate::projection;
@@ -25,12 +25,12 @@ pub async fn run(
     exclude: Option<&[String]>,
     filter: Option<&str>,
     row_ids: RowIds,
-    lance: &LanceArgs,
+    version: &VersionArgs,
     show_progress: bool,
 ) -> Result<()> {
-    let ds = dataset::open(input, Some(lance)).await?;
+    let ds = dataset::open(input, Some(version)).await?;
     let arrow_schema = ds.arrow_schema();
-    let columns = prepare_row_id_columns(ds.as_ref(), columns, exclude, row_ids)?;
+    let columns = prepare_row_id_columns(columns, exclude, row_ids)?;
     let projection = projection::resolve(&arrow_schema, columns.as_deref(), exclude)?;
     let projected_schema = project_arrow_schema(arrow_schema.as_ref(), projection.as_deref());
     let projected_schema = row_id::extend_schema(&projected_schema, row_ids);
@@ -86,7 +86,7 @@ fn make_rng(seed: Option<u64>) -> ChaCha20Rng {
 /// No-filter fast path: pick `limit` distinct positions from `0..rowcount` and
 /// materialise them with a single `take`.
 async fn sample_by_index(
-    ds: &dyn Dataset,
+    ds: &LanceDataset,
     limit: u64,
     seed: Option<u64>,
     projection: Option<&[String]>,
@@ -117,7 +117,7 @@ async fn sample_by_index(
 /// is bounded by `limit` (plus the source batches those slices reference)
 /// rather than the whole filtered result set.
 async fn sample_by_reservoir(
-    ds: &dyn Dataset,
+    ds: &LanceDataset,
     limit: u64,
     seed: Option<u64>,
     projection: Option<&[String]>,

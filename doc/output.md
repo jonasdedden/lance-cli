@@ -25,7 +25,7 @@
 
 ## Table
 
-- Unicode borders on a TTY, an ASCII grid when piped, so `arrs … | grep` stays
+- Unicode borders on a TTY, an ASCII grid when piped, so `lance-cli … | grep` stays
   usable.
 - Primitives render as in CSV.
 - Nested cells are JSON-encoded inside the cell, for example `["id"]` for a
@@ -44,10 +44,10 @@ memory. Pipe it into DuckDB (`read_arrow`), pyarrow
 (`pyarrow.ipc.open_stream`), Polars, or an ADBC tool.
 
 ```sh
-arrs cat --where "score > 0.9" ds.lance --format ipc \
+lance-cli cat --where "score > 0.9" ds.lance --format ipc \
   | duckdb -c "SELECT * FROM read_arrow('/dev/stdin')"
-arrs sample -n 1000 ds.lance --format ipc > sample.arrows
-arrs head -n 100 ds.lance --format ipc \
+lance-cli sample -n 1000 ds.lance --format ipc > sample.arrows
+lance-cli head -n 100 ds.lance --format ipc \
   | python -c "import pyarrow.ipc, sys; print(pyarrow.ipc.open_stream(sys.stdin.buffer).read_all())"
 ```
 
@@ -68,13 +68,13 @@ arrs head -n 100 ds.lance --format ipc \
 Binary payloads are collapsed to a placeholder by default:
 
 ```
-$ arrs head -n 1 dataset.lance
+$ lance-cli head -n 1 dataset.lance
 {"id":1,"data":"BINARY_DATA",…}
 
-$ arrs head -n 1 --binary-format hex dataset.lance
+$ lance-cli head -n 1 --binary-format hex dataset.lance
 {"id":1,"data":"\\x48\\x65\\x6c\\x6c\\x6f",…}
 
-$ arrs head -n 1 --binary-format base64 dataset.lance
+$ lance-cli head -n 1 --binary-format base64 dataset.lance
 {"id":1,"data":"SGVsbG8=",…}
 ```
 

@@ -7,7 +7,6 @@ use crate::Result;
 use crate::cli::Format;
 use crate::commands::common::make_stdout_writer;
 use crate::dataset;
-use crate::error::Error;
 use crate::output::RenderOptions;
 
 pub async fn run(
@@ -18,12 +17,8 @@ pub async fn run(
     render: RenderOptions,
 ) -> Result<()> {
     let ds = dataset::open(input, None).await?;
-    let lance = ds.lance().ok_or_else(|| Error::NotLance {
-        command: "versions",
-        path: input.to_string(),
-    })?;
 
-    let versions = lance.list_versions(branch, tagged_only).await?;
+    let versions = ds.list_versions(branch, tagged_only).await?;
 
     let schema = Arc::new(Schema::new(vec![
         Field::new("version", DataType::UInt64, false),

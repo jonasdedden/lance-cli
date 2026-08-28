@@ -5,25 +5,20 @@ use arrow_array::{Array, RecordBatch, StringArray, TimestampMicrosecondArray, UI
 use arrow_schema::{DataType, Field, Schema, TimeUnit};
 
 use crate::Result;
-use crate::cli::{Format, LanceArgs};
+use crate::cli::{Format, VersionArgs};
 use crate::commands::common::make_stdout_writer;
 use crate::dataset;
-use crate::error::Error;
 use crate::output::RenderOptions;
 
 pub async fn run(
     input: &str,
-    lance: &LanceArgs,
+    version: &VersionArgs,
     format: Format,
     render: RenderOptions,
 ) -> Result<()> {
-    let ds = dataset::open(input, Some(lance)).await?;
-    let lance_caps = ds.lance().ok_or_else(|| Error::NotLance {
-        command: "indices",
-        path: input.to_string(),
-    })?;
+    let ds = dataset::open(input, Some(version)).await?;
 
-    let indices = lance_caps.list_indices().await?;
+    let indices = ds.list_indices().await?;
 
     let columns_field = Arc::new(Field::new("item", DataType::Utf8, true));
     let schema = Arc::new(Schema::new(vec![

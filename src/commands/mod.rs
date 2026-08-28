@@ -1,19 +1,27 @@
 mod blob;
+mod branches;
 mod cat;
 mod common;
 mod completions;
 mod diff;
 mod diff_common;
+mod fragments;
 mod freq;
 mod head;
-mod lance;
+mod index_stats;
+mod indices;
 pub mod progress;
 mod rowcount;
 mod sample;
 mod schema;
+mod search;
+mod stat;
 mod stats;
+mod tags;
 mod tail;
 mod take;
+mod version_diff;
+mod versions;
 
 use std::io::IsTerminal;
 
@@ -36,7 +44,7 @@ pub enum Outcome {
 pub async fn dispatch(cli: Cli) -> Result<Outcome> {
     // Reject `--format` on commands that don't emit row-shaped output — including
     // `completions` — before anything else runs. This must precede the
-    // `completions` interception below, otherwise `arrs completions bash
+    // `completions` interception below, otherwise `lance-cli completions bash
     // --format csv` would silently ignore `--format` instead of erroring.
     if let Some(name) = command_ignoring_format(&cli.command)
         && cli.format.is_some()
@@ -70,8 +78,8 @@ pub async fn dispatch(cli: Cli) -> Result<Outcome> {
     //
     // A single `diff` verb spans two modes, chosen by the number of positional
     // datasets:
-    //   * two datasets (`diff A B`)         -> generic dataset-vs-dataset diff;
-    //   * one dataset + `--from`/`--from-tag`-> Lance version diff.
+    //   * two datasets (`diff A B`)         -> dataset-vs-dataset diff;
+    //   * one dataset + `--from`/`--from-tag`-> version diff.
     // Conflicting combinations (a second dataset alongside version selectors, or
     // one dataset with no `--from`) are rejected here rather than by clap, which
     // cannot express "required only when the second positional is absent".
@@ -86,7 +94,7 @@ pub async fn dispatch(cli: Cli) -> Result<Outcome> {
     } = cli.command
     {
         if let Some(other) = other {
-            // Dataset-vs-dataset mode: Lance version selectors are ambiguous
+            // Dataset-vs-dataset mode: the version selectors are ambiguous
             // across two different datasets, so any of them is a hard error.
             if from.is_some()
                 || from_tag.is_some()
@@ -103,14 +111,14 @@ pub async fn dispatch(cli: Cli) -> Result<Outcome> {
         if from.is_none() && from_tag.is_none() {
             return Err(Error::DiffMissingFromRef);
         }
-        let selectors = lance::diff::DiffSelectors {
+        let selectors = version_diff::DiffSelectors {
             branch,
             from_version: from,
             from_tag,
             to_version: to,
             to_tag,
         };
-        return lance::diff::run(&input, selectors, explicit_format).await;
+        return version_diff::run(&input, selectors, explicit_format).await;
     }
     let format = resolve_format(explicit_format, &cli.command);
     // IPC is a binary, lossless stream: it is only valid on the row-producing
@@ -138,7 +146,7 @@ async fn run_command(
             inputs,
             filter,
             row_ids,
-            lance,
+            version,
         } => {
             cat::run(
                 &inputs,
@@ -148,7 +156,7 @@ async fn run_command(
                 exclude,
                 filter.predicate.as_deref(),
                 row_ids.flags(),
-                &lance,
+                &version,
                 show_progress,
             )
             .await
@@ -158,7 +166,7 @@ async fn run_command(
             limit,
             filter,
             row_ids,
-            lance,
+            version,
         } => {
             head::run(
                 &input,
@@ -169,7 +177,7 @@ async fn run_command(
                 exclude,
                 filter.predicate.as_deref(),
                 row_ids.flags(),
-                &lance,
+                &version,
                 show_progress,
             )
             .await
@@ -179,7 +187,7 @@ async fn run_command(
             limit,
             filter,
             row_ids,
-            lance,
+            version,
         } => {
             tail::run(
                 &input,
@@ -190,7 +198,7 @@ async fn run_command(
                 exclude,
                 filter.predicate.as_deref(),
                 row_ids.flags(),
-                &lance,
+                &version,
                 show_progress,
             )
             .await
@@ -200,7 +208,7 @@ async fn run_command(
             indices,
             filter,
             row_ids,
-            lance,
+            version,
         } => {
             take::run(
                 &input,
@@ -211,7 +219,7 @@ async fn run_command(
                 exclude,
                 filter.predicate.as_deref(),
                 row_ids.flags(),
-                &lance,
+                &version,
             )
             .await
         }
@@ -220,27 +228,27 @@ async fn run_command(
             column,
             index,
             output,
-            lance,
+            version,
         } => {
             // `blob` emits raw bytes, not row-shaped output. `--format` is a hard
             // error via `command_ignoring_format` above (the rowcount/schema
             // precedent for non-row-shaped commands); `--columns`/`--binary-format`
             // don't apply either but are silently ignored, matching how metadata
             // commands treat inapplicable projection/rendering flags.
-            blob::run(&input, &column, index, output.as_deref(), &lance).await
+            blob::run(&input, &column, index, output.as_deref(), &version).await
         }
         Command::Rowcount {
             input,
             filter,
-            lance,
-        } => rowcount::run(&input, filter.predicate.as_deref(), &lance).await,
+            version,
+        } => rowcount::run(&input, filter.predicate.as_deref(), &version).await,
         Command::Sample {
             input,
             limit,
             seed,
             filter,
             row_ids,
-            lance,
+            version,
         } => {
             sample::run(
                 &input,
@@ -252,7 +260,7 @@ async fn run_command(
                 exclude,
                 filter.predicate.as_deref(),
                 row_ids.flags(),
-                &lance,
+                &version,
                 show_progress,
             )
             .await
@@ -263,7 +271,7 @@ async fn run_command(
             limit,
             sort,
             filter,
-            lance,
+            version,
         } => {
             freq::run(
                 &input,
@@ -273,18 +281,18 @@ async fn run_command(
                 format,
                 render,
                 filter.predicate.as_deref(),
-                &lance,
+                &version,
                 show_progress,
             )
             .await
         }
-        Command::Schema { input, ty, lance } => {
-            schema::run(&input, ty, columns, exclude, &lance).await
+        Command::Schema { input, ty, version } => {
+            schema::run(&input, ty, columns, exclude, &version).await
         }
         Command::Stats {
             input,
             filter,
-            lance,
+            version,
         } => {
             stats::run(
                 &input,
@@ -293,7 +301,7 @@ async fn run_command(
                 columns,
                 exclude,
                 filter.predicate.as_deref(),
-                &lance,
+                &version,
                 show_progress,
             )
             .await
@@ -302,19 +310,19 @@ async fn run_command(
             input,
             branch,
             tagged_only,
-        } => lance::versions::run(&input, branch.as_deref(), tagged_only, format, render).await,
-        Command::Branches { input } => lance::branches::run(&input, format, render).await,
-        Command::Tags { input } => lance::tags::run(&input, format, render).await,
+        } => versions::run(&input, branch.as_deref(), tagged_only, format, render).await,
+        Command::Branches { input } => branches::run(&input, format, render).await,
+        Command::Tags { input } => tags::run(&input, format, render).await,
         Command::Indices {
             input,
-            lance: lance_args,
-        } => lance::indices::run(&input, &lance_args, format, render).await,
+            version: version_args,
+        } => indices::run(&input, &version_args, format, render).await,
         Command::Fragments {
             input,
             verbose,
             no_size,
-            lance: lance_args,
-        } => lance::fragments::run(&input, &lance_args, verbose, no_size, format, render).await,
+            version: version_args,
+        } => fragments::run(&input, &version_args, verbose, no_size, format, render).await,
         Command::Search {
             input,
             column,
@@ -323,15 +331,15 @@ async fn run_command(
             k,
             nprobes,
             refine_factor,
-            lance,
+            version,
         } => {
             // clap's `query_vector` group guarantees exactly one of these is set.
             let source = match (vector.as_deref(), vector_file.as_deref()) {
-                (Some(inline), _) => lance::search::QuerySource::Inline(inline),
-                (None, Some(path)) => lance::search::QuerySource::File(path),
+                (Some(inline), _) => search::QuerySource::Inline(inline),
+                (None, Some(path)) => search::QuerySource::File(path),
                 (None, None) => unreachable!("clap requires one of --vector/--vector-file"),
             };
-            lance::search::run(
+            search::run(
                 &input,
                 &column,
                 source,
@@ -342,19 +350,19 @@ async fn run_command(
                 render,
                 columns,
                 exclude,
-                &lance,
+                &version,
             )
             .await
         }
         Command::IndexStats {
             input,
-            lance: lance_args,
-        } => lance::index_stats::run(&input, &lance_args, format, render).await,
+            version: version_args,
+        } => index_stats::run(&input, &version_args, format, render).await,
         Command::Stat {
             input,
             no_size,
-            lance: lance_args,
-        } => lance::stat::run(&input, &lance_args, no_size, format, render).await,
+            version: version_args,
+        } => stat::run(&input, &version_args, no_size, format, render).await,
         // `diff` is intercepted in `dispatch` (distinct format + exit-code
         // handling) and never reaches this shared row-format path.
         Command::Diff { .. } => unreachable!("diff is dispatched separately"),

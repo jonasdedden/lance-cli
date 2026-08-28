@@ -7,22 +7,17 @@ use crate::Result;
 use crate::cli::Format;
 use crate::commands::common::make_stdout_writer;
 use crate::dataset::{self, IndexStats};
-use crate::error::Error;
 use crate::output::RenderOptions;
 
 pub async fn run(
     input: &str,
-    lance: &crate::cli::LanceArgs,
+    version: &crate::cli::VersionArgs,
     format: Format,
     render: RenderOptions,
 ) -> Result<()> {
-    let ds = dataset::open(input, Some(lance)).await?;
-    let lance_caps = ds.lance().ok_or_else(|| Error::NotLance {
-        command: "index-stats",
-        path: input.to_string(),
-    })?;
+    let ds = dataset::open(input, Some(version)).await?;
 
-    let stats = lance_caps.index_stats().await?;
+    let stats = ds.index_stats().await?;
 
     // The `detail` column carries the raw Lance statistics JSON so callers can
     // pass through type-specific internals (IVF partitions, PQ sub-vectors, …).

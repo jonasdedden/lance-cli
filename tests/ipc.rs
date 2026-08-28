@@ -13,12 +13,12 @@ use std::io::Cursor;
 
 use arrow::ipc::reader::StreamReader;
 use arrow_array::RecordBatch;
-use arrs::cli::{BinaryFormat, Cli, Command, FilterArg, Format, LanceArgs, RowIdArgs};
-use arrs::commands::dispatch;
-use arrs::dataset::{self, ScanOptions};
-use arrs::output::make_writer;
-use arrs::output::table::TableStyle;
 use futures::StreamExt;
+use lance_cli::cli::{BinaryFormat, Cli, Command, FilterArg, Format, RowIdArgs, VersionArgs};
+use lance_cli::commands::dispatch;
+use lance_cli::dataset::{self, ScanOptions};
+use lance_cli::output::make_writer;
+use lance_cli::output::table::TableStyle;
 use tokio::runtime::Runtime;
 
 use common::{tempdir, write_full};
@@ -124,13 +124,13 @@ fn ipc_rejected_on_metadata_and_summary_commands() {
             Command::Stats {
                 input: "does-not-matter".to_string(),
                 filter: FilterArg::default(),
-                lance: LanceArgs::default(),
+                version: VersionArgs::default(),
             },
         ))
         .await;
         assert!(matches!(
             stats,
-            Err(arrs::error::Error::IpcNotApplicable { command: "stats" })
+            Err(lance_cli::error::Error::IpcNotApplicable { command: "stats" })
         ));
 
         let freq = dispatch(cli(
@@ -139,15 +139,15 @@ fn ipc_rejected_on_metadata_and_summary_commands() {
                 input: "does-not-matter".to_string(),
                 column: "id".to_string(),
                 limit: None,
-                sort: arrs::cli::FreqSort::Count,
+                sort: lance_cli::cli::FreqSort::Count,
                 filter: FilterArg::default(),
-                lance: LanceArgs::default(),
+                version: VersionArgs::default(),
             },
         ))
         .await;
         assert!(matches!(
             freq,
-            Err(arrs::error::Error::IpcNotApplicable { command: "freq" })
+            Err(lance_cli::error::Error::IpcNotApplicable { command: "freq" })
         ));
 
         let versions = dispatch(cli(
@@ -161,7 +161,7 @@ fn ipc_rejected_on_metadata_and_summary_commands() {
         .await;
         assert!(matches!(
             versions,
-            Err(arrs::error::Error::IpcNotApplicable {
+            Err(lance_cli::error::Error::IpcNotApplicable {
                 command: "versions"
             })
         ));
@@ -186,7 +186,7 @@ fn ipc_rejected_on_diff() {
         .await;
         assert!(matches!(
             res,
-            Err(arrs::error::Error::DiffFormatUnsupported { format: "ipc" })
+            Err(lance_cli::error::Error::DiffFormatUnsupported { format: "ipc" })
         ));
     });
 }
@@ -201,14 +201,14 @@ fn ipc_rejects_value_rendering_flags() {
                 inputs: vec!["does-not-matter".to_string()],
                 filter: FilterArg::default(),
                 row_ids: RowIdArgs::default(),
-                lance: LanceArgs::default(),
+                version: VersionArgs::default(),
             },
         );
         c.binary_format = BinaryFormat::Hex;
         let res = dispatch(c).await;
         assert!(matches!(
             res,
-            Err(arrs::error::Error::IpcRenderingFlag {
+            Err(lance_cli::error::Error::IpcRenderingFlag {
                 flag: "--binary-format"
             })
         ));
@@ -220,14 +220,14 @@ fn ipc_rejects_value_rendering_flags() {
                 inputs: vec!["does-not-matter".to_string()],
                 filter: FilterArg::default(),
                 row_ids: RowIdArgs::default(),
-                lance: LanceArgs::default(),
+                version: VersionArgs::default(),
             },
         );
         c.float_precision = Some(2);
         let res = dispatch(c).await;
         assert!(matches!(
             res,
-            Err(arrs::error::Error::IpcRenderingFlag {
+            Err(lance_cli::error::Error::IpcRenderingFlag {
                 flag: "--float-precision"
             })
         ));

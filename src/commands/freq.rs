@@ -20,10 +20,10 @@ use arrow_schema::{DataType, Field, Schema, SchemaRef};
 use futures::StreamExt;
 
 use crate::Result;
-use crate::cli::{Format, FreqSort, LanceArgs};
+use crate::cli::{Format, FreqSort, VersionArgs};
 use crate::commands::common::make_stdout_writer;
 use crate::commands::progress::ScanProgress;
-use crate::dataset::{self, Dataset, ScanOptions};
+use crate::dataset::{self, LanceDataset, ScanOptions};
 use crate::error::Error;
 use crate::output::RenderOptions;
 use crate::output::value::csv_cell;
@@ -47,10 +47,10 @@ pub async fn run(
     format: Format,
     render: RenderOptions,
     filter: Option<&str>,
-    lance: &LanceArgs,
+    version: &VersionArgs,
     show_progress: bool,
 ) -> Result<()> {
-    let ds = dataset::open(input, Some(lance)).await?;
+    let ds = dataset::open(input, Some(version)).await?;
 
     // Progress: freq scans the whole (optionally filtered) column. Without a
     // filter the row total is a cheap metadata `count_rows`, so show a bar with
@@ -91,7 +91,7 @@ pub async fn run(
 /// out from `run` so tests can exercise it and render it in every format.
 #[allow(clippy::too_many_arguments)]
 async fn compute(
-    ds: &dyn Dataset,
+    ds: &LanceDataset,
     progress: &ScanProgress,
     column: &str,
     limit: Option<u64>,
@@ -133,7 +133,7 @@ struct Counts {
 
 /// Stream the single projected column and tally occurrences.
 async fn accumulate(
-    ds: &dyn Dataset,
+    ds: &LanceDataset,
     progress: &ScanProgress,
     column: &str,
     filter: Option<&str>,
@@ -541,7 +541,7 @@ mod tests {
         &[Some("eggs"), Some("spam"), Some("ham")],
     ];
 
-    async fn open_labels(dir: &Path) -> Arc<dyn Dataset> {
+    async fn open_labels(dir: &Path) -> Arc<LanceDataset> {
         let path = write_labels(dir, "ds", FRAGMENTS).await;
         dataset::open(path.to_str().unwrap(), None).await.unwrap()
     }
@@ -794,7 +794,7 @@ mod tests {
         let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(b.finish())]).unwrap();
         let path = tmp.path().join("nested");
         let iter = RecordBatchIterator::new(vec![Ok(batch)].into_iter(), schema);
-        crate::lance::write_dataset(&path, iter).await.unwrap();
+        crate::dataset::write_dataset(&path, iter).await.unwrap();
         let ds = dataset::open(path.to_str().unwrap(), None).await.unwrap();
 
         let err = compute(
@@ -830,7 +830,7 @@ mod tests {
         .unwrap();
         let path = tmp.path().join("bin");
         let iter = RecordBatchIterator::new(vec![Ok(batch)].into_iter(), schema);
-        crate::lance::write_dataset(&path, iter).await.unwrap();
+        crate::dataset::write_dataset(&path, iter).await.unwrap();
         let ds = dataset::open(path.to_str().unwrap(), None).await.unwrap();
 
         let err = compute(
@@ -906,7 +906,7 @@ mod tests {
         let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(vals)]).unwrap();
         let path = tmp.path().join("floats");
         let iter = RecordBatchIterator::new(vec![Ok(batch)].into_iter(), schema);
-        crate::lance::write_dataset(&path, iter).await.unwrap();
+        crate::dataset::write_dataset(&path, iter).await.unwrap();
         let ds = dataset::open(path.to_str().unwrap(), None).await.unwrap();
 
         let batch = compute(

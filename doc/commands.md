@@ -22,12 +22,12 @@ apply everywhere (`--format`, `--columns`, `--where`, …) are described in
 projection, filter, row-identity, and format flags.
 
 ```sh
-arrs cat part_a.lance part_b.lance      # concatenate; inputs must share a schema
-arrs cat 'data/part_*.lance'            # glob, expanded by arrs in lexicographic order
-arrs head -n 5 dataset.lance
-arrs tail -n 3 dataset.lance
-arrs sample -n 100 --seed 42 dataset.lance
-arrs take --indices '-1,0,2:4' dataset.lance
+lance-cli cat part_a.lance part_b.lance      # concatenate; inputs must share a schema
+lance-cli cat 'data/part_*.lance'            # glob, expanded by lance-cli in lexicographic order
+lance-cli head -n 5 dataset.lance
+lance-cli tail -n 3 dataset.lance
+lance-cli sample -n 100 --seed 42 dataset.lance
+lance-cli take --indices '-1,0,2:4' dataset.lance
 ```
 
 ### `--indices` grammar
@@ -56,8 +56,8 @@ full scan.
 ## `schema`
 
 ```sh
-arrs schema dataset.lance                  # arrow (logical) schema
-arrs schema --type physical dataset.lance  # format-native: field ids, encodings
+lance-cli schema dataset.lance                  # arrow (logical) schema
+lance-cli schema --type physical dataset.lance  # Lance-native: field ids, encodings
 ```
 
 The Arrow schema reflects any projection: `--columns meta.user.id` lists a
@@ -84,10 +84,10 @@ only; they never fail. A column holding any `NaN` reports `NaN` for `mean` and
 `stddev`, while `min` and `max` skip `NaN` and give the real numeric range.
 
 ```sh
-arrs stats dataset.lance
-arrs stats --columns score,label dataset.lance
-arrs stats --where "split = 'test'" dataset.lance
-arrs stats --format jsonl dataset.lance
+lance-cli stats dataset.lance
+lance-cli stats --columns score,label dataset.lance
+lance-cli stats --where "split = 'test'" dataset.lance
+lance-cli stats --format jsonl dataset.lance
 ```
 
 ## `freq`
@@ -96,7 +96,7 @@ Value counts for one column: one row per distinct value with its `count` and
 `percent` of all scanned rows.
 
 ```
-$ arrs freq --column label dataset.lance
+$ lance-cli freq --column label dataset.lance
 +-------+-------+---------+
 | value | count | percent |
 +=========================+
@@ -142,7 +142,7 @@ files beyond summing their sizes, so it stays fast on large datasets, and it
 runs the fragment, version, branch, tag, and index lookups concurrently.
 
 ```
-$ arrs stat sample.lance
+$ lance-cli stat sample.lance
 +--------------+---------------------------------------+
 | metric       | value                                 |
 +======================================================+
@@ -210,11 +210,11 @@ comes from the manifest. Sizes come from the manifest where cached and from
 concurrent object-store lookups otherwise.
 
 ```sh
-arrs fragments dataset.lance
-arrs fragments --version 3 dataset.lance
-arrs fragments --verbose dataset.lance     # include data file paths
-arrs fragments --no-size dataset.lance     # skip size lookups
-arrs fragments --format jsonl dataset.lance
+lance-cli fragments dataset.lance
+lance-cli fragments --version 3 dataset.lance
+lance-cli fragments --verbose dataset.lance     # include data file paths
+lance-cli fragments --no-size dataset.lance     # skip size lookups
+lance-cli fragments --format jsonl dataset.lance
 ```
 
 ## `indices` and `index-stats`
@@ -222,7 +222,7 @@ arrs fragments --format jsonl dataset.lance
 `indices` lists every index on the active version with its type:
 
 ```
-$ arrs indices dataset.lance
+$ lance-cli indices dataset.lance
 | name    | type   | uuid | columns   | dataset_version | created_at |
 | idx_id  | BTree  | …    | ["id"]    | 4               | …          |
 ```
@@ -231,7 +231,7 @@ Lance indices go stale as rows are appended after the index was built.
 `index-stats` reports how many rows are covered:
 
 ```
-$ arrs index-stats dataset.lance
+$ lance-cli index-stats dataset.lance
 | name    | type   | indexed_rows | unindexed_rows | coverage |
 | idx_id  | BTree  | 980000       | 20000          | 98.0%    |
 ```
@@ -242,7 +242,7 @@ raw statistics JSON verbatim, so type-specific internals such as IVF partition
 counts or PQ sub-vectors pass through unchanged:
 
 ```
-$ arrs --format jsonl index-stats dataset.lance
+$ lance-cli --format jsonl index-stats dataset.lance
 {"name":"idx_id","type":"BTree","indexed_rows":980000,"unindexed_rows":20000,"coverage":"98.0%","detail":"{\"index_type\":\"BTree\",…}"}
 ```
 
@@ -269,11 +269,11 @@ width, and it is cast to the column's element type.
 Exactly one of `--vector` and `--vector-file` is required.
 
 ```sh
-arrs search --column embedding --vector '[0.1, 0.2, 0.3]' -k 10 ds.lance
-arrs search --column embedding --vector-file query.json -k 10 ds.lance
-cat query.json | arrs search --column embedding --vector-file - -k 10 ds.lance
-arrs search --column embedding --vector-file q.json -k 10 --nprobes 32 --refine-factor 5 ds.lance
-arrs search --column embedding --vector-file q.json -k 10 --columns id,title ds.lance
+lance-cli search --column embedding --vector '[0.1, 0.2, 0.3]' -k 10 ds.lance
+lance-cli search --column embedding --vector-file query.json -k 10 ds.lance
+cat query.json | lance-cli search --column embedding --vector-file - -k 10 ds.lance
+lance-cli search --column embedding --vector-file q.json -k 10 --nprobes 32 --refine-factor 5 ds.lance
+lance-cli search --column embedding --vector-file q.json -k 10 --columns id,title ds.lance
 ```
 
 Full-text search against inverted indices is planned as a follow-up.
@@ -284,16 +284,16 @@ Writes one cell's raw bytes to a file or to stdout, which is the counterpart to
 the binary rendering options that keep terminal output readable.
 
 ```sh
-arrs blob --column image --index 42 -o out.png dataset.lance
-arrs blob --column audio --index 7 dataset.lance > clip.wav
-arrs blob --column image --index -1 -o last.png dataset.lance
+lance-cli blob --column image --index 42 -o out.png dataset.lance
+lance-cli blob --column audio --index 7 dataset.lance > clip.wav
+lance-cli blob --column image --index -1 -o last.png dataset.lance
 ```
 
 `--index` takes one value and uses the same negative-index semantics as `take`.
 Extraction works on `Binary`, `LargeBinary`, `FixedSizeBinary`, and
 `BinaryView` columns, and on Lance blob-encoded columns
 (`lance-encoding:blob`). Blob-encoded columns are streamed through Lance's blob
-API in bounded chunks, so multi-GB payloads are never held in memory. arrs
+API in bounded chunks, so multi-GB payloads are never held in memory. lance-cli
 picks the path from the column's field metadata.
 
 - Writing raw bytes to an interactive terminal is refused. Pass `-o <file>` or

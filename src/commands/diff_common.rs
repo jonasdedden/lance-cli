@@ -2,7 +2,7 @@
 //!
 //! Both the Lance version diff (`commands::lance::diff`, comparing two versions
 //! of one dataset) and the generic dataset-vs-dataset diff (`commands::diff`,
-//! comparing two different datasets over any backend) compute the same
+//! comparing two different datasets) compute the same
 //! field-by-field schema delta and render it the same way. That logic lives
 //! here so the two commands stay byte-for-byte consistent; each command layers
 //! its own row/fragment/metadata deltas and endpoint labelling on top.
